@@ -3,7 +3,7 @@
 ![GitHub repo size](https://img.shields.io/github/repo-size/ChimeraGaming/LuaScripts)
 ![GitHub last commit](https://img.shields.io/github/last-commit/ChimeraGaming/LuaScripts)
 ![GitHub issues](https://img.shields.io/github/issues/ChimeraGaming/LuaScripts)
-![GitHub license](https://img.shields.io/github/license/ChimeraGaming/LuaScripts)
+![GitHub License](https://img.shields.io/github/license/ChimeraGaming/LuaScripts?cacheSeconds=60)
 
 ---
 
@@ -30,11 +30,10 @@ Expect a mix of experiments, utilities, and evolving projects.
 
 ---
 
-## Contributing / Requests
+## OUTDATED?
 
 If you find an issue, want something updated, or have a request:
-
-👉 Please open a GitHub Issue
+Please open a GitHub Issue
 
 ---
 
