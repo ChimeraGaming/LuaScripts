@@ -481,7 +481,7 @@ Collapse.MouseButton1Click:Connect(function()
     showBubble()
 end)
 
---------------- Close button behavior
+--------------- Close button behavior 
 Close.MouseButton1Click:Connect(function()
     collecting = false
     if collectThread then task.cancel(collectThread) end
