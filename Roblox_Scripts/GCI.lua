@@ -1,12 +1,22 @@
--- Grass Collector
--- Grass Cutting Incremental
--- Credit | Chimera__Gaming
--- FREE AT RSCRIPTS
+--============================================================
+--  GRASS COLLECTOR
+--  Grass Cutting Incremental
+--  Credit | Chimera__Gaming
+--  FREE AT RSCRIPTS
+--============================================================
+
+--============================================================
+--  01. SERVICES
+--============================================================
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
+
+--============================================================
+--  02. PLAYER SETUP
+--============================================================
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -14,13 +24,24 @@ local PlayerGui = Player:WaitForChild("PlayerGui")
 local old = PlayerGui:FindFirstChild("GrassCollector")
 if old then old:Destroy() end
 
+--============================================================
+--  03. RANGE AND SPEED SETTINGS
+--============================================================
+
 local TP_GRASS_RANGE = 150
 local GRASS_TP_RANGE = 150
 local DESERT_RANGE = 750
 local INTERSECTION_RANGE = 150
 
-local BATCH_SIZE = 120
-local TOUCHES_PER_PART = 1
+local OLD_BATCH_SIZE = 180
+local NEW_BATCH_SIZE = 80
+
+local OLD_TOUCHES = 1
+local NEW_TOUCHES = 1
+
+--============================================================
+--  04. MODE STATES
+--============================================================
 
 local modes = {
 	w1TpGrass = false,
@@ -31,15 +52,27 @@ local modes = {
 	w2Intersection = false
 }
 
+--============================================================
+--  05. LOOP AND CACHE STATE
+--============================================================
+
 local connection = nil
 local running = false
+local stopRequested = false
 local cache = {}
 local index = 1
 
+--============================================================
+--  06. UI MEMORY STATE
+--============================================================
+
 local savedPos = UDim2.fromOffset(120, 120)
 local bubblePos = UDim2.fromOffset(120, 120)
-
 local currentTab = "W1"
+
+--============================================================
+--  07. CHARACTER ROOT FINDER
+--============================================================
 
 local function getRoot()
 	local char = Player.Character
@@ -50,6 +83,10 @@ local function getRoot()
 		or char:FindFirstChild("Torso")
 end
 
+--============================================================
+--  08. MODE CHECKER
+--============================================================
+
 local function anyModeOn()
 	for _, v in pairs(modes) do
 		if v then return true end
@@ -57,6 +94,10 @@ local function anyModeOn()
 
 	return false
 end
+
+--============================================================
+--  09. GRASS CACHE BUILDER
+--============================================================
 
 local function rebuildCache()
 	cache = {}
@@ -72,6 +113,10 @@ local function rebuildCache()
 	end
 end
 
+--============================================================
+--  10. SQUARE RANGE CHECK
+--============================================================
+
 local function isInsideSquare(part, root, range)
 	local dx = math.abs(part.Position.X - root.Position.X)
 	local dz = math.abs(part.Position.Z - root.Position.Z)
@@ -80,7 +125,13 @@ local function isInsideSquare(part, root, range)
 	return dx <= half and dz <= half
 end
 
+--============================================================
+--  11. TOUCH HANDLER
+--============================================================
+
 local function touch(part, root)
+	if stopRequested then return end
+
 	pcall(function()
 		part.CanTouch = true
 		part.CanCollide = false
@@ -89,7 +140,14 @@ local function touch(part, root)
 	end)
 end
 
+--============================================================
+--  12. OLD METHOD
+--  Teleports player to grass, touches it, then returns
+--============================================================
+
 local function tpPlayerToGrass(part, root)
+	if stopRequested then return end
+
 	local originalCF = root.CFrame
 
 	pcall(function()
@@ -98,9 +156,12 @@ local function tpPlayerToGrass(part, root)
 		root.CFrame = CFrame.new(part.Position.X, originalCF.Position.Y, part.Position.Z)
 	end)
 
-	for i = 1, TOUCHES_PER_PART do
+	for i = 1, OLD_TOUCHES do
+		if stopRequested then break end
 		touch(part, root)
 	end
+
+	if stopRequested then return end
 
 	pcall(function()
 		root.AssemblyLinearVelocity = Vector3.zero
@@ -109,7 +170,14 @@ local function tpPlayerToGrass(part, root)
 	end)
 end
 
+--============================================================
+--  13. NEW METHOD
+--  Teleports grass to player, touches it, then returns grass
+--============================================================
+
 local function tpGrassToPlayer(part, root)
+	if stopRequested then return end
+
 	local originalPartCF = part.CFrame
 
 	pcall(function()
@@ -121,9 +189,12 @@ local function tpGrassToPlayer(part, root)
 		part.CFrame = root.CFrame
 	end)
 
-	for i = 1, TOUCHES_PER_PART do
+	for i = 1, NEW_TOUCHES do
+		if stopRequested then break end
 		touch(part, root)
 	end
+
+	if stopRequested then return end
 
 	pcall(function()
 		part.AssemblyLinearVelocity = Vector3.zero
@@ -132,9 +203,17 @@ local function tpGrassToPlayer(part, root)
 	end)
 end
 
+--============================================================
+--  14. MODE PROCESSOR
+--============================================================
+
 local function processMode(root, range, bringGrass)
-	for i = 1, BATCH_SIZE do
-		if not anyModeOn() then break end
+	local batch = bringGrass and NEW_BATCH_SIZE or OLD_BATCH_SIZE
+
+	for i = 1, batch do
+		if stopRequested or not anyModeOn() then
+			break
+		end
 
 		if index > #cache then
 			index = 1
@@ -143,6 +222,10 @@ local function processMode(root, range, bringGrass)
 
 		local part = cache[index]
 		index += 1
+
+		if stopRequested or not anyModeOn() then
+			break
+		end
 
 		if part and part.Parent and part:IsA("BasePart") and part.Name == "g" and isInsideSquare(part, root, range) then
 			if bringGrass then
@@ -154,13 +237,17 @@ local function processMode(root, range, bringGrass)
 	end
 end
 
+--============================================================
+--  15. MAIN COLLECTION LOOP
+--============================================================
+
 local function loop()
-	if running or not anyModeOn() then return end
+	if running or stopRequested or not anyModeOn() then return end
 	running = true
 
 	local root = getRoot()
 
-	if not root or type(firetouchinterest) ~= "function" then
+	if stopRequested or not root or type(firetouchinterest) ~= "function" then
 		running = false
 		return
 	end
@@ -169,38 +256,67 @@ local function loop()
 		rebuildCache()
 	end
 
+	if stopRequested then running = false return end
 	if modes.w1TpGrass then processMode(root, TP_GRASS_RANGE, false) end
+
+	if stopRequested then running = false return end
 	if modes.w1GrassTp then processMode(root, GRASS_TP_RANGE, true) end
+
+	if stopRequested then running = false return end
 	if modes.w2TpGrass then processMode(root, TP_GRASS_RANGE, false) end
+
+	if stopRequested then running = false return end
 	if modes.w2GrassTp then processMode(root, GRASS_TP_RANGE, true) end
+
+	if stopRequested then running = false return end
 	if modes.w2Desert then processMode(root, DESERT_RANGE, false) end
+
+	if stopRequested then running = false return end
 	if modes.w2Intersection then processMode(root, INTERSECTION_RANGE, true) end
 
 	running = false
 end
 
+--============================================================
+--  16. LOOP STARTER
+--============================================================
+
 local function startLoop()
+	stopRequested = false
+
 	if connection then return end
 
 	rebuildCache()
 
 	connection = RunService.Heartbeat:Connect(function()
-		if anyModeOn() then
+		if anyModeOn() and not stopRequested then
 			loop()
 		end
 	end)
 end
 
-local function stopLoopIfNeeded()
-	if anyModeOn() then return end
+--============================================================
+--  17. LOOP STOPPER
+--============================================================
+
+local function hardStop()
+	stopRequested = true
+	running = false
 
 	if connection then
 		connection:Disconnect()
 		connection = nil
 	end
-
-	running = false
 end
+
+local function stopLoopIfNeeded()
+	if anyModeOn() then return end
+	hardStop()
+end
+
+--============================================================
+--  18. UI HELPER FUNCTIONS
+--============================================================
 
 local function corner(obj, r)
 	local c = Instance.new("UICorner")
@@ -215,10 +331,18 @@ local function stroke(obj, color, t)
 	s.Parent = obj
 end
 
+--============================================================
+--  19. SCREEN GUI
+--============================================================
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "GrassCollector"
 gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
+
+--============================================================
+--  20. MAIN FRAME
+--============================================================
 
 local frame = Instance.new("Frame")
 frame.Name = "Main"
@@ -229,6 +353,10 @@ frame.BorderSizePixel = 0
 frame.Parent = gui
 corner(frame, 14)
 stroke(frame, Color3.fromRGB(70, 180, 95), 2)
+
+--============================================================
+--  21. TITLE BAR
+--============================================================
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -82, 0, 30)
@@ -270,6 +398,10 @@ dragArea.BackgroundTransparency = 1
 dragArea.Text = ""
 dragArea.Parent = frame
 
+--============================================================
+--  22. TAB BUTTONS
+--============================================================
+
 local tabW1 = Instance.new("TextButton")
 tabW1.Size = UDim2.fromOffset(90, 30)
 tabW1.Position = UDim2.fromOffset(27, 48)
@@ -297,6 +429,10 @@ tabExtra.TextSize = 13
 tabExtra.Parent = frame
 corner(tabExtra, 8)
 
+--============================================================
+--  23. PAGE CREATOR
+--============================================================
+
 local pages = {}
 
 local function makePage(name)
@@ -316,6 +452,10 @@ end
 local w1 = makePage("W1")
 local w2 = makePage("W2")
 local extra = makePage("Extra")
+
+--============================================================
+--  24. UI ELEMENT BUILDERS
+--============================================================
 
 local function makeButton(parent, y, text, color)
 	local b = Instance.new("TextButton")
@@ -353,24 +493,19 @@ local function updateButton(button, onText, offText, active, onColor, offColor)
 	button.BackgroundColor3 = active and onColor or offColor
 end
 
-local function setFrameHeight(tabName)
-	if tabName == "W1" then
-		frame.Size = UDim2.fromOffset(330, 300)
-		credit.Position = UDim2.new(0, 10, 1, -39)
-	elseif tabName == "W2" then
-		frame.Size = UDim2.fromOffset(330, 424)
-		credit.Position = UDim2.new(0, 10, 1, -39)
-	elseif tabName == "Extra" then
-		frame.Size = UDim2.fromOffset(330, 296)
-		credit.Position = UDim2.new(0, 10, 1, -39)
-	end
-end
+--============================================================
+--  25. W1 TAB CONTENT
+--============================================================
 
 local w1TpGrass = makeButton(w1, 0, "TP Grass Off", Color3.fromRGB(55, 70, 55))
 makeNote(w1, 36, "This is the old way but can be faster", Color3.fromRGB(175, 220, 180), 24)
 
 local w1GrassTp = makeButton(w1, 66, "Grass TP Off", Color3.fromRGB(45, 55, 65))
 makeNote(w1, 102, "TP Grass to player. Can be slower but more reliable and less likely to get reported", Color3.fromRGB(180, 210, 230), 36)
+
+--============================================================
+--  26. W2 TAB CONTENT
+--============================================================
 
 local w2TpGrass = makeButton(w2, 0, "TP Grass Off", Color3.fromRGB(55, 70, 55))
 makeNote(w2, 36, "This is the old way but can be faster", Color3.fromRGB(175, 220, 180), 24)
@@ -383,6 +518,10 @@ makeNote(w2, 182, "Only use in Desert", Color3.fromRGB(230, 205, 120), 24)
 
 local w2Intersection = makeButton(w2, 214, "Intersection TP Off", Color3.fromRGB(65, 45, 75))
 makeNote(w2, 250, "Only use this collector in Intersection or your game will break requiring rejoining world to fix.", Color3.fromRGB(235, 160, 180), 40)
+
+--============================================================
+--  27. EXTRA TAB CONTENT
+--============================================================
 
 local github = makeButton(extra, 0, "GitHub | ChimeraGaming LuaScripts", Color3.fromRGB(25, 45, 32))
 local iy = makeButton(extra, 46, "Load Infinite Yield", Color3.fromRGB(35, 35, 45))
@@ -400,6 +539,10 @@ popup.Visible = false
 popup.Parent = extra
 corner(popup, 8)
 
+--============================================================
+--  28. CREDIT FOOTER
+--============================================================
+
 local credit = Instance.new("TextLabel")
 credit.Size = UDim2.new(1, -20, 0, 32)
 credit.Position = UDim2.new(0, 10, 1, -39)
@@ -410,6 +553,68 @@ credit.TextSize = 10
 credit.TextColor3 = Color3.fromRGB(175, 220, 180)
 credit.TextWrapped = true
 credit.Parent = frame
+
+--============================================================
+--  29. HEIGHT MAP
+--============================================================
+
+local function setFrameHeight(tabName)
+	if tabName == "W1" then
+		frame.Size = UDim2.fromOffset(330, 300)
+		credit.Position = UDim2.new(0, 10, 1, -39)
+	elseif tabName == "W2" then
+		frame.Size = UDim2.fromOffset(330, 424)
+		credit.Position = UDim2.new(0, 10, 1, -39)
+	elseif tabName == "Extra" then
+		frame.Size = UDim2.fromOffset(330, 296)
+		credit.Position = UDim2.new(0, 10, 1, -39)
+	end
+end
+
+--============================================================
+--  30. SINGLE MODE LOCK
+--============================================================
+
+local function refreshAllButtons()
+	updateButton(w1TpGrass, "TP Grass On", "TP Grass Off", modes.w1TpGrass, Color3.fromRGB(40, 150, 65), Color3.fromRGB(55, 70, 55))
+	updateButton(w1GrassTp, "Grass TP On", "Grass TP Off", modes.w1GrassTp, Color3.fromRGB(55, 120, 180), Color3.fromRGB(45, 55, 65))
+
+	updateButton(w2TpGrass, "TP Grass On", "TP Grass Off", modes.w2TpGrass, Color3.fromRGB(40, 150, 65), Color3.fromRGB(55, 70, 55))
+	updateButton(w2GrassTp, "Grass TP On", "Grass TP Off", modes.w2GrassTp, Color3.fromRGB(55, 120, 180), Color3.fromRGB(45, 55, 65))
+	updateButton(w2Desert, "Desert On", "Desert Off", modes.w2Desert, Color3.fromRGB(150, 120, 40), Color3.fromRGB(75, 65, 35))
+	updateButton(w2Intersection, "Intersection TP On", "Intersection TP Off", modes.w2Intersection, Color3.fromRGB(130, 70, 160), Color3.fromRGB(65, 45, 75))
+end
+
+local function disableAllModesExcept(modeName)
+	hardStop()
+
+	for k in pairs(modes) do
+		if k ~= modeName then
+			modes[k] = false
+		end
+	end
+
+	refreshAllButtons()
+end
+
+local function toggleSingleMode(modeName)
+	local newState = not modes[modeName]
+
+	disableAllModesExcept(modeName)
+
+	modes[modeName] = newState
+	refreshAllButtons()
+
+	if modes[modeName] then
+		startLoop()
+	else
+		stopLoopIfNeeded()
+	end
+end
+
+--============================================================
+--  31. TAB SWITCHING
+--============================================================
 
 local function showTab(name)
 	currentTab = name
@@ -441,119 +646,37 @@ tabExtra.MouseButton1Click:Connect(function()
 	showTab("Extra")
 end)
 
+--============================================================
+--  32. COLLECTOR BUTTON CLICKS
+--============================================================
+
 w1TpGrass.MouseButton1Click:Connect(function()
-	modes.w1TpGrass = not modes.w1TpGrass
-
-	updateButton(
-		w1TpGrass,
-		"TP Grass On",
-		"TP Grass Off",
-		modes.w1TpGrass,
-		Color3.fromRGB(40, 150, 65),
-		Color3.fromRGB(55, 70, 55)
-	)
-
-	if modes.w1TpGrass then
-		startLoop()
-	else
-		stopLoopIfNeeded()
-	end
+	toggleSingleMode("w1TpGrass")
 end)
 
 w1GrassTp.MouseButton1Click:Connect(function()
-	modes.w1GrassTp = not modes.w1GrassTp
-
-	updateButton(
-		w1GrassTp,
-		"Grass TP On",
-		"Grass TP Off",
-		modes.w1GrassTp,
-		Color3.fromRGB(55, 120, 180),
-		Color3.fromRGB(45, 55, 65)
-	)
-
-	if modes.w1GrassTp then
-		startLoop()
-	else
-		stopLoopIfNeeded()
-	end
+	toggleSingleMode("w1GrassTp")
 end)
 
 w2TpGrass.MouseButton1Click:Connect(function()
-	modes.w2TpGrass = not modes.w2TpGrass
-
-	updateButton(
-		w2TpGrass,
-		"TP Grass On",
-		"TP Grass Off",
-		modes.w2TpGrass,
-		Color3.fromRGB(40, 150, 65),
-		Color3.fromRGB(55, 70, 55)
-	)
-
-	if modes.w2TpGrass then
-		startLoop()
-	else
-		stopLoopIfNeeded()
-	end
+	toggleSingleMode("w2TpGrass")
 end)
 
 w2GrassTp.MouseButton1Click:Connect(function()
-	modes.w2GrassTp = not modes.w2GrassTp
-
-	updateButton(
-		w2GrassTp,
-		"Grass TP On",
-		"Grass TP Off",
-		modes.w2GrassTp,
-		Color3.fromRGB(55, 120, 180),
-		Color3.fromRGB(45, 55, 65)
-	)
-
-	if modes.w2GrassTp then
-		startLoop()
-	else
-		stopLoopIfNeeded()
-	end
+	toggleSingleMode("w2GrassTp")
 end)
 
 w2Desert.MouseButton1Click:Connect(function()
-	modes.w2Desert = not modes.w2Desert
-
-	updateButton(
-		w2Desert,
-		"Desert On",
-		"Desert Off",
-		modes.w2Desert,
-		Color3.fromRGB(150, 120, 40),
-		Color3.fromRGB(75, 65, 35)
-	)
-
-	if modes.w2Desert then
-		startLoop()
-	else
-		stopLoopIfNeeded()
-	end
+	toggleSingleMode("w2Desert")
 end)
 
 w2Intersection.MouseButton1Click:Connect(function()
-	modes.w2Intersection = not modes.w2Intersection
-
-	updateButton(
-		w2Intersection,
-		"Intersection TP On",
-		"Intersection TP Off",
-		modes.w2Intersection,
-		Color3.fromRGB(130, 70, 160),
-		Color3.fromRGB(65, 45, 75)
-	)
-
-	if modes.w2Intersection then
-		startLoop()
-	else
-		stopLoopIfNeeded()
-	end
+	toggleSingleMode("w2Intersection")
 end)
+
+--============================================================
+--  33. EXTRA BUTTON CLICKS
+--============================================================
 
 github.MouseButton1Click:Connect(function()
 	setclipboard("https://github.com/ChimeraGaming/LuaScripts")
@@ -571,18 +694,23 @@ iy.MouseButton1Click:Connect(function()
 	loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Infinite-Yield-43437"))()
 end)
 
+--============================================================
+--  34. CLOSE BUTTON
+--============================================================
+
 close.MouseButton1Click:Connect(function()
+	hardStop()
+
 	for k in pairs(modes) do
 		modes[k] = false
 	end
 
-	if connection then
-		connection:Disconnect()
-		connection = nil
-	end
-
 	gui:Destroy()
 end)
+
+--============================================================
+--  35. DRAGGING
+--============================================================
 
 local dragging = false
 local dragStart
@@ -619,6 +747,10 @@ UIS.InputEnded:Connect(function(i)
 	end
 end)
 
+--============================================================
+--  36. MINIMIZE BUBBLE
+--============================================================
+
 local bubble = Instance.new("TextButton")
 bubble.Size = UDim2.fromOffset(52, 52)
 bubble.Position = bubblePos
@@ -646,6 +778,11 @@ bubble.MouseButton1Click:Connect(function()
 	showTab(currentTab)
 end)
 
+--============================================================
+--  37. STARTUP
+--============================================================
+
+refreshAllButtons()
 showTab("W1")
 
 print("Grass Collector Tabs Loaded")
