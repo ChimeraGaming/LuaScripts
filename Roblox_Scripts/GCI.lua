@@ -29,15 +29,19 @@ if old then old:Destroy() end
 --============================================================
 
 local TP_GRASS_RANGE = 150
-local GRASS_TP_RANGE = 150
+local WALK_GRASS_RANGE = 150
 local DESERT_RANGE = 750
 local INTERSECTION_RANGE = 150
 
 local OLD_BATCH_SIZE = 180
-local NEW_BATCH_SIZE = 80
-
 local OLD_TOUCHES = 1
-local NEW_TOUCHES = 1
+
+local WALK_SPEED = 1500
+local WALK_REACH_DISTANCE = 5
+local WALK_TIMEOUT = 4
+
+local CLUSTER_SCAN_RADIUS = 50
+local CLUSTER_DISTANCE_WEIGHT = 0.2
 
 --============================================================
 --  04. MODE STATES
@@ -45,11 +49,11 @@ local NEW_TOUCHES = 1
 
 local modes = {
 	w1TpGrass = false,
-	w1GrassTp = false,
+	w1GrassWalk = false,
 	w2TpGrass = false,
-	w2GrassTp = false,
+	w2GrassWalk = false,
 	w2Desert = false,
-	w2Intersection = false
+	w2IntersectionWalk = false
 }
 
 --============================================================
@@ -84,7 +88,18 @@ local function getRoot()
 end
 
 --============================================================
---  08. MODE CHECKER
+--  08. HUMANOID FINDER
+--============================================================
+
+local function getHumanoid()
+	local char = Player.Character
+	if not char then return nil end
+
+	return char:FindFirstChildOfClass("Humanoid")
+end
+
+--============================================================
+--  09. MODE CHECKER
 --============================================================
 
 local function anyModeOn()
@@ -96,7 +111,7 @@ local function anyModeOn()
 end
 
 --============================================================
---  09. GRASS CACHE BUILDER
+--  10. GRASS CACHE BUILDER
 --============================================================
 
 local function rebuildCache()
@@ -114,7 +129,7 @@ local function rebuildCache()
 end
 
 --============================================================
---  10. SQUARE RANGE CHECK
+--  11. SQUARE RANGE CHECK
 --============================================================
 
 local function isInsideSquare(part, root, range)
@@ -126,7 +141,7 @@ local function isInsideSquare(part, root, range)
 end
 
 --============================================================
---  11. TOUCH HANDLER
+--  12. TOUCH HANDLER
 --============================================================
 
 local function touch(part, root)
@@ -141,7 +156,7 @@ local function touch(part, root)
 end
 
 --============================================================
---  12. OLD METHOD
+--  13. OLD METHOD
 --  Teleports player to grass, touches it, then returns
 --============================================================
 
@@ -171,46 +186,122 @@ local function tpPlayerToGrass(part, root)
 end
 
 --============================================================
---  13. NEW METHOD
---  Teleports grass to player, touches it, then returns grass
+--  14. SMART WALK TARGET FINDER
+--  Finds the grass inside the largest nearby group
 --============================================================
 
-local function tpGrassToPlayer(part, root)
-	if stopRequested then return end
+local function findNearestGrass(root, range)
+	local folder = Workspace:FindFirstChild("GrassObjects")
+	if not folder then return nil end
 
-	local originalPartCF = part.CFrame
+	local grassParts = {}
 
-	pcall(function()
-		part.Anchored = false
-		part.CanCollide = false
-		part.CanTouch = true
-		part.AssemblyLinearVelocity = Vector3.zero
-		part.AssemblyAngularVelocity = Vector3.zero
-		part.CFrame = root.CFrame
-	end)
-
-	for i = 1, NEW_TOUCHES do
-		if stopRequested then break end
-		touch(part, root)
+	for _, part in ipairs(folder:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name == "g" and isInsideSquare(part, root, range) then
+			table.insert(grassParts, part)
+		end
 	end
 
-	if stopRequested then return end
+	if #grassParts == 0 then
+		return nil
+	end
 
-	pcall(function()
-		part.AssemblyLinearVelocity = Vector3.zero
-		part.AssemblyAngularVelocity = Vector3.zero
-		part.CFrame = originalPartCF
-	end)
+	local bestPart = nil
+	local bestScore = -math.huge
+
+	for _, part in ipairs(grassParts) do
+		if part and part.Parent then
+			local groupCount = 0
+
+			for _, other in ipairs(grassParts) do
+				if other and other.Parent then
+					local dist = (other.Position - part.Position).Magnitude
+
+					if dist <= CLUSTER_SCAN_RADIUS then
+						groupCount += 1
+					end
+				end
+			end
+
+			local playerDist = (part.Position - root.Position).Magnitude
+			local score = groupCount - (playerDist * CLUSTER_DISTANCE_WEIGHT)
+
+			if score > bestScore then
+				bestScore = score
+				bestPart = part
+			end
+		end
+	end
+
+	return bestPart
 end
 
 --============================================================
---  14. MODE PROCESSOR
+--  15. WALK METHOD
+--  Forces WalkSpeed to 100 and walks to nearest grass
 --============================================================
 
-local function processMode(root, range, bringGrass)
-	local batch = bringGrass and NEW_BATCH_SIZE or OLD_BATCH_SIZE
+local function walkPlayerToGrass(root, range)
+	if stopRequested then return end
 
-	for i = 1, batch do
+	local humanoid = getHumanoid()
+	if not humanoid then return end
+
+	local target = findNearestGrass(root, range)
+	if not target then return end
+
+	local startTime = tick()
+
+	humanoid.WalkSpeed = WALK_SPEED
+
+	while target and target.Parent and not stopRequested do
+		local currentRoot = getRoot()
+		local currentHumanoid = getHumanoid()
+
+		if not currentRoot or not currentHumanoid then
+			break
+		end
+
+		currentHumanoid.WalkSpeed = WALK_SPEED
+		currentHumanoid:MoveTo(target.Position)
+
+		local dist = (target.Position - currentRoot.Position).Magnitude
+
+		if dist <= WALK_REACH_DISTANCE then
+			touch(target, currentRoot)
+			break
+		end
+
+		if tick() - startTime >= WALK_TIMEOUT then
+			break
+		end
+
+		task.wait(0.03)
+	end
+
+	if stopRequested then
+		local currentRoot = getRoot()
+		local currentHumanoid = getHumanoid()
+
+		if currentRoot and currentHumanoid then
+			currentHumanoid:MoveTo(currentRoot.Position)
+		end
+	end
+end
+
+--============================================================
+--  16. MODE PROCESSOR
+--============================================================
+
+local function processMode(root, range, walkMode)
+	if stopRequested or not anyModeOn() then return end
+
+	if walkMode then
+		walkPlayerToGrass(root, range)
+		return
+	end
+
+	for i = 1, OLD_BATCH_SIZE do
 		if stopRequested or not anyModeOn() then
 			break
 		end
@@ -228,17 +319,13 @@ local function processMode(root, range, bringGrass)
 		end
 
 		if part and part.Parent and part:IsA("BasePart") and part.Name == "g" and isInsideSquare(part, root, range) then
-			if bringGrass then
-				tpGrassToPlayer(part, root)
-			else
-				tpPlayerToGrass(part, root)
-			end
+			tpPlayerToGrass(part, root)
 		end
 	end
 end
 
 --============================================================
---  15. MAIN COLLECTION LOOP
+--  17. MAIN COLLECTION LOOP
 --============================================================
 
 local function loop()
@@ -260,25 +347,25 @@ local function loop()
 	if modes.w1TpGrass then processMode(root, TP_GRASS_RANGE, false) end
 
 	if stopRequested then running = false return end
-	if modes.w1GrassTp then processMode(root, GRASS_TP_RANGE, true) end
+	if modes.w1GrassWalk then processMode(root, WALK_GRASS_RANGE, true) end
 
 	if stopRequested then running = false return end
 	if modes.w2TpGrass then processMode(root, TP_GRASS_RANGE, false) end
 
 	if stopRequested then running = false return end
-	if modes.w2GrassTp then processMode(root, GRASS_TP_RANGE, true) end
+	if modes.w2GrassWalk then processMode(root, WALK_GRASS_RANGE, true) end
 
 	if stopRequested then running = false return end
 	if modes.w2Desert then processMode(root, DESERT_RANGE, false) end
 
 	if stopRequested then running = false return end
-	if modes.w2Intersection then processMode(root, INTERSECTION_RANGE, true) end
+	if modes.w2IntersectionWalk then processMode(root, INTERSECTION_RANGE, true) end
 
 	running = false
 end
 
 --============================================================
---  16. LOOP STARTER
+--  18. LOOP STARTER
 --============================================================
 
 local function startLoop()
@@ -296,12 +383,19 @@ local function startLoop()
 end
 
 --============================================================
---  17. LOOP STOPPER
+--  19. LOOP STOPPER
 --============================================================
 
 local function hardStop()
 	stopRequested = true
 	running = false
+
+	local root = getRoot()
+	local humanoid = getHumanoid()
+
+	if root and humanoid then
+		humanoid:MoveTo(root.Position)
+	end
 
 	if connection then
 		connection:Disconnect()
@@ -315,7 +409,7 @@ local function stopLoopIfNeeded()
 end
 
 --============================================================
---  18. UI HELPER FUNCTIONS
+--  20. UI HELPER FUNCTIONS
 --============================================================
 
 local function corner(obj, r)
@@ -332,7 +426,7 @@ local function stroke(obj, color, t)
 end
 
 --============================================================
---  19. SCREEN GUI
+--  21. SCREEN GUI
 --============================================================
 
 local gui = Instance.new("ScreenGui")
@@ -341,7 +435,7 @@ gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
 --============================================================
---  20. MAIN FRAME
+--  22. MAIN FRAME
 --============================================================
 
 local frame = Instance.new("Frame")
@@ -355,7 +449,7 @@ corner(frame, 14)
 stroke(frame, Color3.fromRGB(70, 180, 95), 2)
 
 --============================================================
---  21. TITLE BAR
+--  23. TITLE BAR
 --============================================================
 
 local title = Instance.new("TextLabel")
@@ -399,7 +493,7 @@ dragArea.Text = ""
 dragArea.Parent = frame
 
 --============================================================
---  22. TAB BUTTONS
+--  24. TAB BUTTONS
 --============================================================
 
 local tabW1 = Instance.new("TextButton")
@@ -430,7 +524,7 @@ tabExtra.Parent = frame
 corner(tabExtra, 8)
 
 --============================================================
---  23. PAGE CREATOR
+--  25. PAGE CREATOR
 --============================================================
 
 local pages = {}
@@ -454,7 +548,7 @@ local w2 = makePage("W2")
 local extra = makePage("Extra")
 
 --============================================================
---  24. UI ELEMENT BUILDERS
+--  26. UI ELEMENT BUILDERS
 --============================================================
 
 local function makeButton(parent, y, text, color)
@@ -494,33 +588,33 @@ local function updateButton(button, onText, offText, active, onColor, offColor)
 end
 
 --============================================================
---  25. W1 TAB CONTENT
+--  27. W1 TAB CONTENT
 --============================================================
 
 local w1TpGrass = makeButton(w1, 0, "TP Grass Off", Color3.fromRGB(55, 70, 55))
 makeNote(w1, 36, "This is the old way but can be faster", Color3.fromRGB(175, 220, 180), 24)
 
-local w1GrassTp = makeButton(w1, 66, "Grass TP Off", Color3.fromRGB(45, 55, 65))
-makeNote(w1, 102, "TP Grass to player. Can be slower but more reliable and less likely to get reported", Color3.fromRGB(180, 210, 230), 36)
+local w1GrassWalk = makeButton(w1, 66, "Grass Walk Off", Color3.fromRGB(45, 55, 65))
+makeNote(w1, 102, "Walks to nearest grass with WalkSpeed forced to 100.", Color3.fromRGB(180, 210, 230), 36)
 
 --============================================================
---  26. W2 TAB CONTENT
+--  28. W2 TAB CONTENT
 --============================================================
 
 local w2TpGrass = makeButton(w2, 0, "TP Grass Off", Color3.fromRGB(55, 70, 55))
 makeNote(w2, 36, "This is the old way but can be faster", Color3.fromRGB(175, 220, 180), 24)
 
-local w2GrassTp = makeButton(w2, 66, "Grass TP Off", Color3.fromRGB(45, 55, 65))
-makeNote(w2, 102, "TP Grass to player. Can be slower but more reliable and less likely to get reported", Color3.fromRGB(180, 210, 230), 36)
+local w2GrassWalk = makeButton(w2, 66, "Grass Walk Off", Color3.fromRGB(45, 55, 65))
+makeNote(w2, 102, "Walks to nearest grass with WalkSpeed forced to 100.", Color3.fromRGB(180, 210, 230), 36)
 
 local w2Desert = makeButton(w2, 146, "Desert Off", Color3.fromRGB(75, 65, 35))
 makeNote(w2, 182, "Only use in Desert", Color3.fromRGB(230, 205, 120), 24)
 
-local w2Intersection = makeButton(w2, 214, "Intersection TP Off", Color3.fromRGB(65, 45, 75))
-makeNote(w2, 250, "Only use this collector in Intersection or your game will break requiring rejoining world to fix.", Color3.fromRGB(235, 160, 180), 40)
+local w2IntersectionWalk = makeButton(w2, 214, "Intersection Walk Off", Color3.fromRGB(65, 45, 75))
+makeNote(w2, 250, "Only use this walker in Intersection or your game may break requiring rejoining world to fix.", Color3.fromRGB(235, 160, 180), 40)
 
 --============================================================
---  27. EXTRA TAB CONTENT
+--  29. EXTRA TAB CONTENT
 --============================================================
 
 local github = makeButton(extra, 0, "GitHub | ChimeraGaming LuaScripts", Color3.fromRGB(25, 45, 32))
@@ -540,7 +634,7 @@ popup.Parent = extra
 corner(popup, 8)
 
 --============================================================
---  28. CREDIT FOOTER
+--  30. CREDIT FOOTER
 --============================================================
 
 local credit = Instance.new("TextLabel")
@@ -555,7 +649,7 @@ credit.TextWrapped = true
 credit.Parent = frame
 
 --============================================================
---  29. HEIGHT MAP
+--  31. HEIGHT MAP
 --============================================================
 
 local function setFrameHeight(tabName)
@@ -572,17 +666,17 @@ local function setFrameHeight(tabName)
 end
 
 --============================================================
---  30. SINGLE MODE LOCK
+--  32. SINGLE MODE LOCK
 --============================================================
 
 local function refreshAllButtons()
 	updateButton(w1TpGrass, "TP Grass On", "TP Grass Off", modes.w1TpGrass, Color3.fromRGB(40, 150, 65), Color3.fromRGB(55, 70, 55))
-	updateButton(w1GrassTp, "Grass TP On", "Grass TP Off", modes.w1GrassTp, Color3.fromRGB(55, 120, 180), Color3.fromRGB(45, 55, 65))
+	updateButton(w1GrassWalk, "Grass Walk On", "Grass Walk Off", modes.w1GrassWalk, Color3.fromRGB(55, 120, 180), Color3.fromRGB(45, 55, 65))
 
 	updateButton(w2TpGrass, "TP Grass On", "TP Grass Off", modes.w2TpGrass, Color3.fromRGB(40, 150, 65), Color3.fromRGB(55, 70, 55))
-	updateButton(w2GrassTp, "Grass TP On", "Grass TP Off", modes.w2GrassTp, Color3.fromRGB(55, 120, 180), Color3.fromRGB(45, 55, 65))
+	updateButton(w2GrassWalk, "Grass Walk On", "Grass Walk Off", modes.w2GrassWalk, Color3.fromRGB(55, 120, 180), Color3.fromRGB(45, 55, 65))
 	updateButton(w2Desert, "Desert On", "Desert Off", modes.w2Desert, Color3.fromRGB(150, 120, 40), Color3.fromRGB(75, 65, 35))
-	updateButton(w2Intersection, "Intersection TP On", "Intersection TP Off", modes.w2Intersection, Color3.fromRGB(130, 70, 160), Color3.fromRGB(65, 45, 75))
+	updateButton(w2IntersectionWalk, "Intersection Walk On", "Intersection Walk Off", modes.w2IntersectionWalk, Color3.fromRGB(130, 70, 160), Color3.fromRGB(65, 45, 75))
 end
 
 local function disableAllModesExcept(modeName)
@@ -613,7 +707,7 @@ local function toggleSingleMode(modeName)
 end
 
 --============================================================
---  31. TAB SWITCHING
+--  33. TAB SWITCHING
 --============================================================
 
 local function showTab(name)
@@ -647,35 +741,35 @@ tabExtra.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
---  32. COLLECTOR BUTTON CLICKS
+--  34. COLLECTOR BUTTON CLICKS
 --============================================================
 
 w1TpGrass.MouseButton1Click:Connect(function()
 	toggleSingleMode("w1TpGrass")
 end)
 
-w1GrassTp.MouseButton1Click:Connect(function()
-	toggleSingleMode("w1GrassTp")
+w1GrassWalk.MouseButton1Click:Connect(function()
+	toggleSingleMode("w1GrassWalk")
 end)
 
 w2TpGrass.MouseButton1Click:Connect(function()
 	toggleSingleMode("w2TpGrass")
 end)
 
-w2GrassTp.MouseButton1Click:Connect(function()
-	toggleSingleMode("w2GrassTp")
+w2GrassWalk.MouseButton1Click:Connect(function()
+	toggleSingleMode("w2GrassWalk")
 end)
 
 w2Desert.MouseButton1Click:Connect(function()
 	toggleSingleMode("w2Desert")
 end)
 
-w2Intersection.MouseButton1Click:Connect(function()
-	toggleSingleMode("w2Intersection")
+w2IntersectionWalk.MouseButton1Click:Connect(function()
+	toggleSingleMode("w2IntersectionWalk")
 end)
 
 --============================================================
---  33. EXTRA BUTTON CLICKS
+--  35. EXTRA BUTTON CLICKS
 --============================================================
 
 github.MouseButton1Click:Connect(function()
@@ -695,7 +789,7 @@ iy.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
---  34. CLOSE BUTTON
+--  36. CLOSE BUTTON
 --============================================================
 
 close.MouseButton1Click:Connect(function()
@@ -709,7 +803,7 @@ close.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
---  35. DRAGGING
+--  37. DRAGGING
 --============================================================
 
 local dragging = false
@@ -748,7 +842,7 @@ UIS.InputEnded:Connect(function(i)
 end)
 
 --============================================================
---  36. MINIMIZE BUBBLE
+--  38. MINIMIZE BUBBLE
 --============================================================
 
 local bubble = Instance.new("TextButton")
@@ -779,7 +873,7 @@ bubble.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
---  37. STARTUP
+--  39. STARTUP
 --============================================================
 
 refreshAllButtons()
