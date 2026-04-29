@@ -12,7 +12,6 @@ local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
 local UIS               = game:GetService("UserInputService")
-local VIM               = game:GetService("VirtualInputManager")
 
 local Player    = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -27,7 +26,7 @@ if old then
 end
 
 --============================================================
--- 03. FOLDERS / REMOTES
+-- 03. FOLDERS AND REMOTES
 --============================================================
 
 local EventsFolder = ReplicatedStorage:FindFirstChild("Events")
@@ -45,139 +44,188 @@ Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = PlayerGui
 
 --============================================================
--- 05. PANEL
+-- 05. AURA COLORS
+--============================================================
+
+local AuraDark      = Color3.fromRGB(18, 9, 35)
+local AuraPanel     = Color3.fromRGB(25, 12, 48)
+local AuraPanel2    = Color3.fromRGB(38, 18, 70)
+local AuraPurple    = Color3.fromRGB(145, 80, 255)
+local AuraPink      = Color3.fromRGB(255, 90, 210)
+local AuraBlue      = Color3.fromRGB(90, 220, 255)
+local AuraText      = Color3.fromRGB(235, 220, 255)
+local AuraSoftText  = Color3.fromRGB(190, 170, 255)
+
+--============================================================
+-- 06. PANEL
 --============================================================
 
 local Panel = Instance.new("Frame")
 Panel.Name = "Panel"
-Panel.Size = UDim2.fromOffset(260, 280)
-Panel.Position = UDim2.new(0.5, -130, 0.35, -140)
-Panel.BackgroundColor3 = Color3.fromRGB(10, 12, 28)
-Panel.BackgroundTransparency = 0.05
+Panel.Size = UDim2.fromOffset(280, 250)
+Panel.Position = UDim2.new(0.5, -140, 0.35, -125)
+Panel.BackgroundColor3 = AuraDark
+Panel.BackgroundTransparency = 0.04
 Panel.BorderSizePixel = 0
+Panel.Active = true
 Panel.Parent = Gui
 
-Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 16)
 
 local Stroke = Instance.new("UIStroke")
 Stroke.Thickness = 2
-Stroke.Color = Color3.fromRGB(0, 200, 255)
+Stroke.Color = AuraPurple
 Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 Stroke.Parent = Panel
 
+local Gradient = Instance.new("UIGradient")
+Gradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 10, 55)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(42, 17, 78)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 12, 38))
+})
+Gradient.Rotation = 35
+Gradient.Parent = Panel
+
 --============================================================
--- 06. HEADER
+-- 07. HEADER
 --============================================================
+
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.Size = UDim2.new(1, 0, 0, 36)
+Header.Position = UDim2.fromOffset(0, 0)
+Header.BackgroundTransparency = 1
+Header.Active = true
+Header.Parent = Panel
 
 local Title = Instance.new("TextLabel")
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, -80, 0, 24)
-Title.Position = UDim2.fromOffset(12, 6)
-Title.Text = "[✨] Aura Farming Incremental"
+Title.Size = UDim2.new(1, -82, 1, 0)
+Title.Position = UDim2.fromOffset(12, 0)
+Title.Text = "[✨] Aura Collector"
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.TextColor3 = Color3.fromRGB(150, 230, 255)
+Title.TextSize = 15
+Title.TextColor3 = AuraText
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = Panel
+Title.Parent = Header
 
 --============================================================
--- 07. CLOSE BUTTON
+-- 08. CLOSE BUTTON
 --============================================================
 
 local Close = Instance.new("TextButton")
-Close.Size = UDim2.fromOffset(22, 22)
-Close.Position = UDim2.new(1, -28, 0, 6)
-Close.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+Close.Size = UDim2.fromOffset(24, 24)
+Close.Position = UDim2.new(1, -30, 0, 6)
+Close.BackgroundColor3 = Color3.fromRGB(55, 18, 45)
 Close.Text = "X"
 Close.Font = Enum.Font.GothamBold
 Close.TextSize = 13
-Close.TextColor3 = Color3.fromRGB(255, 100, 100)
+Close.TextColor3 = Color3.fromRGB(255, 120, 160)
 Close.AutoButtonColor = false
-Close.Parent = Panel
+Close.Active = true
+Close.Parent = Header
 
-Instance.new("UICorner", Close).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", Close).CornerRadius = UDim.new(0, 7)
 
 --============================================================
--- 08. COLLAPSE BUTTON
+-- 09. COLLAPSE BUTTON
 --============================================================
 
 local Collapse = Instance.new("TextButton")
-Collapse.Size = UDim2.fromOffset(22, 22)
-Collapse.Position = UDim2.new(1, -54, 0, 6)
-Collapse.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+Collapse.Size = UDim2.fromOffset(24, 24)
+Collapse.Position = UDim2.new(1, -58, 0, 6)
+Collapse.BackgroundColor3 = Color3.fromRGB(35, 20, 65)
 Collapse.Text = "v"
 Collapse.Font = Enum.Font.GothamBold
 Collapse.TextSize = 16
-Collapse.TextColor3 = Color3.fromRGB(150, 200, 255)
+Collapse.TextColor3 = AuraBlue
 Collapse.AutoButtonColor = false
-Collapse.Parent = Panel
+Collapse.Active = true
+Collapse.Parent = Header
 
-Instance.new("UICorner", Collapse).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", Collapse).CornerRadius = UDim.new(0, 7)
 
 --============================================================
--- 09. PANEL DRAGGING
+-- 10. PANEL DRAGGING
 --============================================================
 
-local dragging = false
-local dragStart
-local startPos
+local panelDragging = false
+local panelDragStart
+local panelStartPos
 
-local function mouseInTitleArea()
-	local m = UIS:GetMouseLocation()
-	local p = Panel.AbsolutePosition
-	local s = Panel.AbsoluteSize
-
-	return m.X >= p.X
-		and m.X <= p.X + s.X
-		and m.Y >= p.Y
-		and m.Y <= p.Y + 30
+local function beginPanelDrag(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		panelDragging = true
+		panelDragStart = UIS:GetMouseLocation()
+		panelStartPos = Panel.Position
+	end
 end
 
-UIS.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 and mouseInTitleArea() then
-		dragging = true
-		dragStart = UIS:GetMouseLocation()
-		startPos = Panel.Position
-	end
-end)
+Header.InputBegan:Connect(beginPanelDrag)
+Title.InputBegan:Connect(beginPanelDrag)
 
 UIS.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement and dragStart and startPos then
-		local m = UIS:GetMouseLocation()
-		local dx = m.X - dragStart.X
-		local dy = m.Y - dragStart.Y
+	if panelDragging and input.UserInputType == Enum.UserInputType.MouseMovement and panelDragStart and panelStartPos then
+		local mousePos = UIS:GetMouseLocation()
+		local dx = mousePos.X - panelDragStart.X
+		local dy = mousePos.Y - panelDragStart.Y
 
 		Panel.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + dx,
-			startPos.Y.Scale,
-			startPos.Y.Offset + dy
+			panelStartPos.X.Scale,
+			panelStartPos.X.Offset + dx,
+			panelStartPos.Y.Scale,
+			panelStartPos.Y.Offset + dy
 		)
 	end
 end)
 
 UIS.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
+		panelDragging = false
 	end
 end)
 
 --============================================================
--- 10. AURA COLLECTOR TOGGLE
+-- 11. BUTTON HELPER
 --============================================================
 
-local ToggleCollect = Instance.new("TextButton")
-ToggleCollect.Size = UDim2.new(1, -24, 0, 44)
-ToggleCollect.Position = UDim2.fromOffset(12, 44)
-ToggleCollect.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
-ToggleCollect.Text = "Aura Collector: OFF"
-ToggleCollect.Font = Enum.Font.GothamBold
-ToggleCollect.TextSize = 18
-ToggleCollect.TextColor3 = Color3.fromRGB(180, 220, 255)
-ToggleCollect.AutoButtonColor = false
-ToggleCollect.Parent = Panel
+local function makeButton(name, text, y, bgColor, textColor)
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Size = UDim2.new(1, -24, 0, 42)
+	btn.Position = UDim2.fromOffset(12, y)
+	btn.BackgroundColor3 = bgColor
+	btn.Text = text
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 16
+	btn.TextColor3 = textColor or AuraText
+	btn.AutoButtonColor = false
+	btn.Active = true
+	btn.Parent = Panel
 
-Instance.new("UICorner", ToggleCollect).CornerRadius = UDim.new(0, 10)
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 11)
+
+	local btnStroke = Instance.new("UIStroke")
+	btnStroke.Thickness = 1
+	btnStroke.Color = Color3.fromRGB(95, 55, 155)
+	btnStroke.Transparency = 0.35
+	btnStroke.Parent = btn
+
+	return btn
+end
+
+--============================================================
+-- 12. AURA COLLECTOR TOGGLE
+--============================================================
+
+local ToggleCollect = makeButton(
+	"ToggleCollect",
+	"Aura Collector: OFF",
+	46,
+	AuraPanel2,
+	AuraText
+)
 
 local collecting = false
 local collectThread
@@ -185,12 +233,12 @@ local collectThread
 local function setCollectVisual(on)
 	if on then
 		ToggleCollect.Text = "Aura Collector: ON"
-		ToggleCollect.BackgroundColor3 = Color3.fromRGB(40, 0, 120)
-		ToggleCollect.TextColor3 = Color3.fromRGB(255, 255, 255)
+		ToggleCollect.BackgroundColor3 = Color3.fromRGB(95, 30, 180)
+		ToggleCollect.TextColor3 = Color3.fromRGB(255, 245, 255)
 	else
 		ToggleCollect.Text = "Aura Collector: OFF"
-		ToggleCollect.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
-		ToggleCollect.TextColor3 = Color3.fromRGB(180, 220, 255)
+		ToggleCollect.BackgroundColor3 = AuraPanel2
+		ToggleCollect.TextColor3 = AuraText
 	end
 end
 
@@ -239,146 +287,16 @@ end)
 setCollectVisual(false)
 
 --============================================================
--- 11. WALKSPEED SLIDER SETTINGS
+-- 13. GIVE DROPS BUTTON
 --============================================================
 
-local MIN_WS = 50
-local MAX_WS = 100
-local currentWS = 75
-
---============================================================
--- 12. WALKSPEED SLIDER UI
---============================================================
-
-local SliderFrame = Instance.new("Frame")
-SliderFrame.Size = UDim2.new(1, -24, 0, 60)
-SliderFrame.Position = UDim2.fromOffset(12, 96)
-SliderFrame.BackgroundTransparency = 1
-SliderFrame.Parent = Panel
-
-local WSLabel = Instance.new("TextLabel")
-WSLabel.BackgroundTransparency = 1
-WSLabel.Size = UDim2.new(1, 0, 0, 24)
-WSLabel.Position = UDim2.fromOffset(0, 0)
-WSLabel.Font = Enum.Font.GothamBold
-WSLabel.TextSize = 16
-WSLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
-WSLabel.TextXAlignment = Enum.TextXAlignment.Left
-WSLabel.Text = "WalkSpeed: " .. currentWS
-WSLabel.Parent = SliderFrame
-
-local Bar = Instance.new("Frame")
-Bar.Size = UDim2.new(1, 0, 0, 6)
-Bar.Position = UDim2.fromOffset(0, 34)
-Bar.BackgroundColor3 = Color3.fromRGB(40, 40, 80)
-Bar.BorderSizePixel = 0
-Bar.Parent = SliderFrame
-
-Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 3)
-
-local Fill = Instance.new("Frame")
-Fill.Size = UDim2.new((currentWS - MIN_WS) / (MAX_WS - MIN_WS), 0, 1, 0)
-Fill.Position = UDim2.fromOffset(0, 0)
-Fill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-Fill.BorderSizePixel = 0
-Fill.Parent = Bar
-
-Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 3)
-
-local Knob = Instance.new("Frame")
-Knob.Size = UDim2.fromOffset(12, 12)
-Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Knob.BorderSizePixel = 0
-Knob.Parent = Bar
-
-Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
-
-local function updateKnob()
-	local alpha = (currentWS - MIN_WS) / (MAX_WS - MIN_WS)
-
-	Fill.Size = UDim2.new(alpha, 0, 1, 0)
-	Knob.Position = UDim2.new(alpha, -6, 0.5, -6)
-	WSLabel.Text = "WalkSpeed: " .. currentWS
-end
-
-updateKnob()
-
-local draggingSlider = false
-
-local function setValueFromMouse(x)
-	local pos = Bar.AbsolutePosition.X
-	local size = Bar.AbsoluteSize.X
-
-	if size <= 0 then
-		return
-	end
-
-	local alpha = math.clamp((x - pos) / size, 0, 1)
-
-	currentWS = math.floor(MIN_WS + (MAX_WS - MIN_WS) * alpha + 0.5)
-
-	updateKnob()
-end
-
-Bar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		draggingSlider = true
-		setValueFromMouse(UIS:GetMouseLocation().X)
-	end
-end)
-
-Knob.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		draggingSlider = true
-		setValueFromMouse(UIS:GetMouseLocation().X)
-	end
-end)
-
-UIS.InputChanged:Connect(function(input)
-	if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
-		setValueFromMouse(UIS:GetMouseLocation().X)
-	end
-end)
-
-UIS.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		draggingSlider = false
-	end
-end)
-
---============================================================
--- 13. WALKSPEED ENFORCEMENT
---============================================================
-
-task.spawn(function()
-	while Gui.Parent do
-		local char = Player.Character or Player.CharacterAdded:Wait()
-		local hum = char:FindFirstChildOfClass("Humanoid")
-
-		if hum then
-			hum.WalkSpeed = currentWS
-		end
-
-		task.wait(0.01)
-	end
-end)
-
---============================================================
--- 14. GIVE DROPS BUTTON
---============================================================
-
-local GiveDrops = Instance.new("TextButton")
-GiveDrops.Size = UDim2.new(1, -24, 0, 40)
-GiveDrops.Position = UDim2.fromOffset(12, 156)
-GiveDrops.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
-GiveDrops.Text = "Give 100,000 Each Drop"
-GiveDrops.Font = Enum.Font.GothamBold
-GiveDrops.TextSize = 16
-GiveDrops.TextColor3 = Color3.fromRGB(255, 255, 255)
-GiveDrops.AutoButtonColor = false
-GiveDrops.Parent = Panel
-
-Instance.new("UICorner", GiveDrops).CornerRadius = UDim.new(0, 10)
+local GiveDrops = makeButton(
+	"GiveDrops",
+	"Give 100,000 Each Drop",
+	96,
+	Color3.fromRGB(72, 28, 105),
+	Color3.fromRGB(255, 245, 255)
+)
 
 local function give100kDrops()
 	local stats = Player:FindFirstChild("Stats")
@@ -399,84 +317,39 @@ end
 GiveDrops.MouseButton1Click:Connect(give100kDrops)
 
 --============================================================
--- 15. ANTI AFK BUTTON
+-- 14. INFINITE YIELD BUTTON
 --============================================================
 
-local AntiAFK = Instance.new("TextButton")
-AntiAFK.Size = UDim2.new(1, -24, 0, 40)
-AntiAFK.Position = UDim2.fromOffset(12, 200)
-AntiAFK.BackgroundColor3 = Color3.fromRGB(30, 60, 60)
-AntiAFK.Text = "Anti AFK: OFF"
-AntiAFK.Font = Enum.Font.GothamBold
-AntiAFK.TextSize = 16
-AntiAFK.TextColor3 = Color3.fromRGB(180, 220, 255)
-AntiAFK.AutoButtonColor = false
-AntiAFK.Parent = Panel
+local InfiniteYield = makeButton(
+	"InfiniteYield",
+	"Infinite Yield",
+	146,
+	Color3.fromRGB(42, 24, 90),
+	AuraText
+)
 
-Instance.new("UICorner", AntiAFK).CornerRadius = UDim.new(0, 10)
-
-local antiAFKOn = false
-local antiAFKThread
-
-local function setAntiAFKVisual(on)
-	if on then
-		AntiAFK.Text = "Anti AFK: ON"
-		AntiAFK.BackgroundColor3 = Color3.fromRGB(0, 130, 90)
-		AntiAFK.TextColor3 = Color3.fromRGB(255, 255, 255)
-	else
-		AntiAFK.Text = "Anti AFK: OFF"
-		AntiAFK.BackgroundColor3 = Color3.fromRGB(30, 60, 60)
-		AntiAFK.TextColor3 = Color3.fromRGB(180, 220, 255)
-	end
-end
-
-local function doJumpOnce()
-	local char = Player.Character or Player.CharacterAdded:Wait()
-	local hum = char:FindFirstChildOfClass("Humanoid")
-
-	if hum then
-		hum.Jump = true
-
-		pcall(function()
-			VIM:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-			task.wait(0.05)
-			VIM:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-		end)
-	end
-end
-
-local function antiAFKLoop()
-	while antiAFKOn and Gui.Parent do
-		doJumpOnce()
-
-		local total = 0
-
-		while total < 10 and antiAFKOn and Gui.Parent do
-			task.wait(0.2)
-			total += 0.2
-		end
-	end
-end
-
-AntiAFK.MouseButton1Click:Connect(function()
-	antiAFKOn = not antiAFKOn
-	setAntiAFKVisual(antiAFKOn)
-
-	if antiAFKOn then
-		if antiAFKThread then
-			task.cancel(antiAFKThread)
-		end
-
-		antiAFKThread = task.spawn(antiAFKLoop)
-	else
-		if antiAFKThread then
-			task.cancel(antiAFKThread)
-			antiAFKThread = nil
-		end
-	end
+InfiniteYield.MouseButton1Click:Connect(function()
+	pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+	end)
 end)
 
-setAntiAFKVisual(false)
+--============================================================
+-- 15. INFINITE YIELD NOTE
+--============================================================
+
+local IYNote = Instance.new("TextLabel")
+IYNote.BackgroundTransparency = 1
+IYNote.Size = UDim2.new(1, -24, 0, 34)
+IYNote.Position = UDim2.fromOffset(12, 190)
+IYNote.Font = Enum.Font.GothamSemibold
+IYNote.TextSize = 12
+IYNote.TextColor3 = AuraSoftText
+IYNote.TextXAlignment = Enum.TextXAlignment.Left
+IYNote.TextYAlignment = Enum.TextYAlignment.Top
+IYNote.TextWrapped = true
+IYNote.Text = "> Note: Enable Anti AFK inside Infinite Yield for best results."
+IYNote.Parent = Panel
 
 --============================================================
 -- 16. CREDIT LABEL
@@ -484,11 +357,11 @@ setAntiAFKVisual(false)
 
 local Credit = Instance.new("TextLabel")
 Credit.BackgroundTransparency = 1
-Credit.Size = UDim2.new(1, -24, 0, 32)
-Credit.Position = UDim2.new(0, 12, 1, -40)
+Credit.Size = UDim2.new(1, -24, 0, 28)
+Credit.Position = UDim2.new(0, 12, 1, -32)
 Credit.Font = Enum.Font.GothamSemibold
 Credit.TextSize = 12
-Credit.TextColor3 = Color3.fromRGB(140, 190, 220)
+Credit.TextColor3 = Color3.fromRGB(165, 210, 255)
 Credit.TextXAlignment = Enum.TextXAlignment.Left
 Credit.TextYAlignment = Enum.TextYAlignment.Top
 Credit.TextWrapped = true
@@ -501,7 +374,7 @@ Credit.Parent = Panel
 
 local Bubble
 local savedPanelPos = Panel.Position
-local bubblePos = UDim2.new(0.5, -23, 0.1, 0)
+local bubblePos = UDim2.new(0.5, -24, 0.1, 0)
 
 local function showBubble()
 	if Bubble and Bubble.Parent then
@@ -509,50 +382,66 @@ local function showBubble()
 	end
 
 	Bubble = Instance.new("Frame")
-	Bubble.Name = "PunchBubble"
-	Bubble.Size = UDim2.fromOffset(46, 46)
+	Bubble.Name = "AuraBubble"
+	Bubble.Size = UDim2.fromOffset(50, 50)
 	Bubble.Position = bubblePos
-	Bubble.BackgroundColor3 = Color3.fromRGB(20, 24, 44)
+	Bubble.BackgroundColor3 = AuraPanel
 	Bubble.BorderSizePixel = 0
+	Bubble.Active = true
 	Bubble.Parent = Gui
 
 	Instance.new("UICorner", Bubble).CornerRadius = UDim.new(1, 0)
 
-	local s = Instance.new("UIStroke")
-	s.Thickness = 2
-	s.Color = Color3.fromRGB(0, 200, 255)
-	s.Parent = Bubble
+	local bStroke = Instance.new("UIStroke")
+	bStroke.Thickness = 2
+	bStroke.Color = AuraPink
+	bStroke.Parent = Bubble
+
+	local bGradient = Instance.new("UIGradient")
+	bGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(65, 25, 120)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 12, 45))
+	})
+	bGradient.Rotation = 45
+	bGradient.Parent = Bubble
 
 	local Icon = Instance.new("TextButton")
 	Icon.Size = UDim2.fromScale(1, 1)
 	Icon.BackgroundTransparency = 1
 	Icon.Text = "✨"
 	Icon.Font = Enum.Font.GothamBold
-	Icon.TextSize = 26
-	Icon.TextColor3 = Color3.fromRGB(180, 230, 255)
+	Icon.TextSize = 27
+	Icon.TextColor3 = Color3.fromRGB(255, 220, 255)
 	Icon.AutoButtonColor = false
+	Icon.Active = true
 	Icon.Parent = Bubble
 
 	local bDragging = false
+	local bMoved = false
 	local bStart
 	local bPos
 
-	local function beginDrag(input)
+	local function beginBubbleDrag(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			bDragging = true
+			bMoved = false
 			bStart = UIS:GetMouseLocation()
 			bPos = Bubble.Position
 		end
 	end
 
-	Bubble.InputBegan:Connect(beginDrag)
-	Icon.InputBegan:Connect(beginDrag)
+	Bubble.InputBegan:Connect(beginBubbleDrag)
+	Icon.InputBegan:Connect(beginBubbleDrag)
 
 	UIS.InputChanged:Connect(function(input)
 		if bDragging and input.UserInputType == Enum.UserInputType.MouseMovement and bStart and bPos then
-			local m = UIS:GetMouseLocation()
-			local dx = m.X - bStart.X
-			local dy = m.Y - bStart.Y
+			local mousePos = UIS:GetMouseLocation()
+			local dx = mousePos.X - bStart.X
+			local dy = mousePos.Y - bStart.Y
+
+			if math.abs(dx) > 3 or math.abs(dy) > 3 then
+				bMoved = true
+			end
 
 			Bubble.Position = UDim2.new(
 				bPos.X.Scale,
@@ -571,6 +460,10 @@ local function showBubble()
 	end)
 
 	Icon.MouseButton1Click:Connect(function()
+		if bMoved then
+			return
+		end
+
 		if Bubble then
 			Bubble:Destroy()
 			Bubble = nil
@@ -597,13 +490,6 @@ Close.MouseButton1Click:Connect(function()
 	if collectThread then
 		task.cancel(collectThread)
 		collectThread = nil
-	end
-
-	antiAFKOn = false
-
-	if antiAFKThread then
-		task.cancel(antiAFKThread)
-		antiAFKThread = nil
 	end
 
 	Gui:Destroy()
