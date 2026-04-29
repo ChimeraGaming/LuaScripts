@@ -43,6 +43,10 @@ local scripts = {
 		File = "Money_Incremental.lua"
 	},
 	{
+		Name = "🌙 [UPD 5] Moon Incremental",
+		File = "Moon_Incremental.lua"
+	},
+	{
 		Name = "Simple UI for copying player coordinates",
 		File = "Simple_Copy_Cords.lua"
 	},
@@ -67,14 +71,13 @@ gui.Parent = PlayerGui
 --============================================================
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(320, 335)
-frame.Position = UDim2.new(0.5, -160, 0.5, -165)
+frame.Size = UDim2.fromOffset(320, 380)
+frame.Position = UDim2.new(0.5, -160, 0.5, -190)
 frame.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0, 14)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 14)
 
 local stroke = Instance.new("UIStroke", frame)
 stroke.Color = Color3.fromRGB(0, 200, 255)
