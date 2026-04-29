@@ -1,9 +1,5 @@
 --============================================================
--- Object Collector UI
--- WalkSpeed Slider
--- Give 100k Drops
--- Anti AFK
--- Collapsible Punch Bubble
+-- Aura Farming Incremental
 -- Credit | Chimera__Gaming
 -- FREE AT RSCRIPTS
 --============================================================
@@ -22,10 +18,10 @@ local Player    = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
 --============================================================
--- 02. REMOVE OLD UI
+-- 02. CLEANUP OLD UI
 --============================================================
 
-local old = PlayerGui:FindFirstChild("ObjectCollectorUI")
+local old = PlayerGui:FindFirstChild("AuraFarmingUI")
 if old then
 	old:Destroy()
 end
@@ -42,14 +38,14 @@ local evCollect    = EventsFolder and EventsFolder:FindFirstChild("CollectObject
 --============================================================
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "ObjectCollectorUI"
+Gui.Name = "AuraFarmingUI"
 Gui.IgnoreGuiInset = true
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = PlayerGui
 
 --============================================================
--- 05. MAIN PANEL
+-- 05. PANEL
 --============================================================
 
 local Panel = Instance.new("Frame")
@@ -77,9 +73,9 @@ local Title = Instance.new("TextLabel")
 Title.BackgroundTransparency = 1
 Title.Size = UDim2.new(1, -80, 0, 24)
 Title.Position = UDim2.fromOffset(12, 6)
-Title.Text = "Object Collector"
+Title.Text = "[✨] Aura Farming Incremental"
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.TextSize = 14
 Title.TextColor3 = Color3.fromRGB(150, 230, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = Panel
@@ -167,14 +163,14 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --============================================================
--- 10. OBJECT COLLECTOR BUTTON
+-- 10. AURA COLLECTOR TOGGLE
 --============================================================
 
 local ToggleCollect = Instance.new("TextButton")
 ToggleCollect.Size = UDim2.new(1, -24, 0, 44)
 ToggleCollect.Position = UDim2.fromOffset(12, 44)
 ToggleCollect.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
-ToggleCollect.Text = "Object Collector: OFF"
+ToggleCollect.Text = "Aura Collector: OFF"
 ToggleCollect.Font = Enum.Font.GothamBold
 ToggleCollect.TextSize = 18
 ToggleCollect.TextColor3 = Color3.fromRGB(180, 220, 255)
@@ -188,11 +184,11 @@ local collectThread
 
 local function setCollectVisual(on)
 	if on then
-		ToggleCollect.Text = "Object Collector: ON"
+		ToggleCollect.Text = "Aura Collector: ON"
 		ToggleCollect.BackgroundColor3 = Color3.fromRGB(40, 0, 120)
 		ToggleCollect.TextColor3 = Color3.fromRGB(255, 255, 255)
 	else
-		ToggleCollect.Text = "Object Collector: OFF"
+		ToggleCollect.Text = "Aura Collector: OFF"
 		ToggleCollect.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
 		ToggleCollect.TextColor3 = Color3.fromRGB(180, 220, 255)
 	end
@@ -243,7 +239,7 @@ end)
 setCollectVisual(false)
 
 --============================================================
--- 11. WALKSPEED SETTINGS
+-- 11. WALKSPEED SLIDER SETTINGS
 --============================================================
 
 local MIN_WS = 50
@@ -351,7 +347,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --============================================================
--- 13. WALKSPEED ENFORCEMENT LOOP
+-- 13. WALKSPEED ENFORCEMENT
 --============================================================
 
 task.spawn(function()
@@ -368,7 +364,7 @@ task.spawn(function()
 end)
 
 --============================================================
--- 14. GIVE 100,000 EACH DROP BUTTON
+-- 14. GIVE DROPS BUTTON
 --============================================================
 
 local GiveDrops = Instance.new("TextButton")
@@ -500,16 +496,12 @@ Credit.Text = "Credit | Chimera__Gaming\nFREE AT RSCRIPTS"
 Credit.Parent = Panel
 
 --============================================================
--- 17. COLLAPSE BUBBLE STATE
+-- 17. COLLAPSE BUBBLE
 --============================================================
 
 local Bubble
 local savedPanelPos = Panel.Position
 local bubblePos = UDim2.new(0.5, -23, 0.1, 0)
-
---============================================================
--- 18. COLLAPSE BUBBLE UI
---============================================================
 
 local function showBubble()
 	if Bubble and Bubble.Parent then
@@ -534,9 +526,9 @@ local function showBubble()
 	local Icon = Instance.new("TextButton")
 	Icon.Size = UDim2.fromScale(1, 1)
 	Icon.BackgroundTransparency = 1
-	Icon.Text = "Punch"
+	Icon.Text = "✨"
 	Icon.Font = Enum.Font.GothamBold
-	Icon.TextSize = 12
+	Icon.TextSize = 26
 	Icon.TextColor3 = Color3.fromRGB(180, 230, 255)
 	Icon.AutoButtonColor = false
 	Icon.Parent = Bubble
@@ -589,10 +581,6 @@ local function showBubble()
 	end)
 end
 
---============================================================
--- 19. COLLAPSE BUTTON LOGIC
---============================================================
-
 Collapse.MouseButton1Click:Connect(function()
 	savedPanelPos = Panel.Position
 	Panel.Visible = false
@@ -600,7 +588,7 @@ Collapse.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
--- 20. CLOSE BUTTON LOGIC
+-- 18. CLOSE BUTTON BEHAVIOR
 --============================================================
 
 Close.MouseButton1Click:Connect(function()
@@ -608,19 +596,21 @@ Close.MouseButton1Click:Connect(function()
 
 	if collectThread then
 		task.cancel(collectThread)
+		collectThread = nil
 	end
 
 	antiAFKOn = false
 
 	if antiAFKThread then
 		task.cancel(antiAFKThread)
+		antiAFKThread = nil
 	end
 
 	Gui:Destroy()
 end)
 
 --============================================================
--- 21. LOADED
+-- 19. LOADED
 --============================================================
 
-print("[Object Collector] UI Loaded.")
+print("[Aura Farming Incremental] UI Loaded.")
