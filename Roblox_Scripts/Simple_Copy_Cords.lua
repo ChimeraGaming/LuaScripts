@@ -1,5 +1,11 @@
+--============================================================
 -- Simple Compact Coords UI
 -- Built by Chimera__Gaming
+--============================================================
+
+--============================================================
+-- 01. SERVICES
+--============================================================
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -8,11 +14,19 @@ local StarterGui = game:GetService("StarterGui")
 local player = Players.LocalPlayer
 local pg = player:WaitForChild("PlayerGui")
 
--- Clean up if re-run
-local old = pg:FindFirstChild("SimpleCoordsUI")
-if old then old:Destroy() end
+--============================================================
+-- 02. CLEANUP OLD UI
+--============================================================
 
--- Root
+local old = pg:FindFirstChild("SimpleCoordsUI")
+if old then
+	old:Destroy()
+end
+
+--============================================================
+-- 03. ROOT GUI
+--============================================================
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "SimpleCoordsUI"
 gui.IgnoreGuiInset = true
@@ -20,7 +34,10 @@ gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = pg
 
--- Window (smaller)
+--============================================================
+-- 04. MAIN WINDOW
+--============================================================
+
 local window = Instance.new("Frame")
 window.Name = "Window"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -30,10 +47,18 @@ window.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 window.BorderSizePixel = 0
 window.Active = true
 window.Parent = gui
-local corner = Instance.new("UICorner", window); corner.CornerRadius = UDim.new(0, 8)
-local stroke = Instance.new("UIStroke", window); stroke.Thickness = 1; stroke.Color = Color3.fromRGB(80, 80, 90)
 
--- Credit
+local corner = Instance.new("UICorner", window)
+corner.CornerRadius = UDim.new(0, 8)
+
+local stroke = Instance.new("UIStroke", window)
+stroke.Thickness = 1
+stroke.Color = Color3.fromRGB(80, 80, 90)
+
+--============================================================
+-- 05. CREDIT LABEL
+--============================================================
+
 local credit = Instance.new("TextLabel")
 credit.BackgroundTransparency = 1
 credit.Text = "Built by Chimera__Gaming"
@@ -45,7 +70,10 @@ credit.Position = UDim2.new(0, 10, 0, 6)
 credit.TextXAlignment = Enum.TextXAlignment.Left
 credit.Parent = window
 
--- Close button
+--============================================================
+-- 06. CLOSE BUTTON
+--============================================================
+
 local closeBtn = Instance.new("TextButton")
 closeBtn.Text = "X"
 closeBtn.Font = Enum.Font.GothamBold
@@ -55,9 +83,15 @@ closeBtn.BackgroundTransparency = 1
 closeBtn.Size = UDim2.fromOffset(20, 20)
 closeBtn.Position = UDim2.new(1, -24, 0, 4)
 closeBtn.Parent = window
-closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
 
--- Button
+closeBtn.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+--============================================================
+-- 07. GET COORDS BUTTON
+--============================================================
+
 local btn = Instance.new("TextButton")
 btn.Text = "Get Coords"
 btn.Font = Enum.Font.GothamBold
@@ -67,9 +101,14 @@ btn.BackgroundColor3 = Color3.fromRGB(70, 100, 255)
 btn.Size = UDim2.fromOffset(140, 36)
 btn.Position = UDim2.new(0.5, -70, 0.5, -10)
 btn.Parent = window
-local btnCorner = Instance.new("UICorner", btn); btnCorner.CornerRadius = UDim.new(0, 6)
 
--- Feedback
+local btnCorner = Instance.new("UICorner", btn)
+btnCorner.CornerRadius = UDim.new(0, 6)
+
+--============================================================
+-- 08. FEEDBACK LABEL
+--============================================================
+
 local feedback = Instance.new("TextLabel")
 feedback.BackgroundTransparency = 1
 feedback.Text = ""
@@ -82,61 +121,115 @@ feedback.TextYAlignment = Enum.TextYAlignment.Center
 feedback.TextXAlignment = Enum.TextXAlignment.Center
 feedback.Parent = window
 
--- Clipboard / coords logic
-local function round(n) return math.floor(n + 0.5) end
+--============================================================
+-- 09. CLIPBOARD / COORDS HELPERS
+--============================================================
+
+local function round(n)
+	return math.floor(n + 0.5)
+end
+
 local function copyToClipboard(text)
 	if typeof(setclipboard) == "function" then
-		return pcall(function() setclipboard(text) end)
+		return pcall(function()
+			setclipboard(text)
+		end)
 	end
+
 	return false
 end
+
+--============================================================
+-- 10. GET COORDS LOGIC
+--============================================================
 
 btn.MouseButton1Click:Connect(function()
 	local char = player.Character or player.CharacterAdded:Wait()
 	local root = char:FindFirstChild("HumanoidRootPart")
+
 	if not root then
 		feedback.Text = "Character not found"
 		feedback.TextColor3 = Color3.fromRGB(255, 150, 150)
 		return
 	end
+
 	local p = root.Position
 	local coords = string.format("%d, %d, %d", round(p.X), round(p.Y), round(p.Z))
+
 	print("[Coords] " .. coords)
+
 	if copyToClipboard(coords) then
 		feedback.Text = "Copied: " .. coords
 		feedback.TextColor3 = Color3.fromRGB(200, 255, 200)
-		StarterGui:SetCore("SendNotification", {Title = "Coords", Text = coords, Duration = 2})
+
+		StarterGui:SetCore("SendNotification", {
+			Title = "Coords",
+			Text = coords,
+			Duration = 2
+		})
 	else
 		feedback.Text = "Clipboard not available"
 		feedback.TextColor3 = Color3.fromRGB(255, 220, 170)
 	end
 end)
 
--- Dragging
-local dragging, dragStart, startPos = false, nil, nil
+--============================================================
+-- 11. DRAGGING STATE
+--============================================================
+
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+--============================================================
+-- 12. DRAGGING HELPERS
+--============================================================
+
 local function beginDrag(input)
 	dragging = true
 	dragStart = input.Position
 	startPos = window.Position
 end
+
 local function updateDrag(input)
-	if not dragging then return end
+	if not dragging then
+		return
+	end
+
 	local delta = input.Position - dragStart
-	window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-	                            startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+
+	window.Position = UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset + delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset + delta.Y
+	)
 end
+
+--============================================================
+-- 13. DRAGGING CONNECTIONS
+--============================================================
+
 window.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		beginDrag(input)
 	end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseMovement then
 		updateDrag(input)
 	end
 end)
+
 UserInputService.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		dragging = false
 	end
 end)
+
+--============================================================
+-- 14. LOADED
+--============================================================
+
+print("[Simple Coords UI] Loaded.")
