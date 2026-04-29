@@ -1,22 +1,18 @@
 --============================================================
---  GRASS COLLECTOR
---  Grass Cutting Incremental
---  Credit | Chimera__Gaming
---  FREE AT RSCRIPTS
+-- Grass Collector
+-- Grass Cutting Incremental
+-- Credit | Chimera__Gaming
+-- FREE AT RSCRIPTS
 --============================================================
 
 --============================================================
---  01. SERVICES
+-- 01. SERVICES
 --============================================================
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
-
---============================================================
---  02. PLAYER SETUP
---============================================================
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -25,61 +21,51 @@ local old = PlayerGui:FindFirstChild("GrassCollector")
 if old then old:Destroy() end
 
 --============================================================
---  03. RANGE AND SPEED SETTINGS
+-- 02. SETTINGS
 --============================================================
 
-local TP_GRASS_RANGE = 150
-local WALK_GRASS_RANGE = 150
-local DESERT_RANGE = 750
-local INTERSECTION_RANGE = 150
+local TP_RANGE = 150
+local DESERT_RANGE = 850
 
-local OLD_BATCH_SIZE = 180
-local OLD_TOUCHES = 1
+local WALK_RANGE = 850
+local WALK_SPEED = 50
+local WALK_RECHECK_DELAY = 0
 
-local WALK_SPEED = 1500
-local WALK_REACH_DISTANCE = 5
-local WALK_TIMEOUT = 4
-
-local CLUSTER_SCAN_RADIUS = 50
-local CLUSTER_DISTANCE_WEIGHT = 0.2
+local BATCH_SIZE = 120
+local TOUCHES_PER_PART = 1
 
 --============================================================
---  04. MODE STATES
+-- 03. STATE
 --============================================================
 
-local modes = {
-	w1TpGrass = false,
-	w1GrassWalk = false,
-	w2TpGrass = false,
-	w2GrassWalk = false,
-	w2Desert = false,
-	w2IntersectionWalk = false
-}
-
---============================================================
---  05. LOOP AND CACHE STATE
---============================================================
+local tpEnabled = false
+local desertEnabled = false
+local walkEnabled = false
 
 local connection = nil
 local running = false
-local stopRequested = false
+
+local walkConnection = nil
+local walkTarget = nil
+local originalWalkSpeed = nil
+local lastWalkSearch = 0
+
 local cache = {}
 local index = 1
 
---============================================================
---  06. UI MEMORY STATE
---============================================================
-
 local savedPos = UDim2.fromOffset(120, 120)
 local bubblePos = UDim2.fromOffset(120, 120)
-local currentTab = "W1"
 
 --============================================================
---  07. CHARACTER ROOT FINDER
+-- 04. CHARACTER HELPERS
 --============================================================
+
+local function getChar()
+	return Player.Character
+end
 
 local function getRoot()
-	local char = Player.Character
+	local char = getChar()
 	if not char then return nil end
 
 	return char:FindFirstChild("HumanoidRootPart")
@@ -87,31 +73,24 @@ local function getRoot()
 		or char:FindFirstChild("Torso")
 end
 
---============================================================
---  08. HUMANOID FINDER
---============================================================
-
 local function getHumanoid()
-	local char = Player.Character
+	local char = getChar()
 	if not char then return nil end
 
 	return char:FindFirstChildOfClass("Humanoid")
 end
 
---============================================================
---  09. MODE CHECKER
---============================================================
+local function forceJump()
+	local hum = getHumanoid()
 
-local function anyModeOn()
-	for _, v in pairs(modes) do
-		if v then return true end
+	if hum then
+		hum.Jump = true
+		hum:ChangeState(Enum.HumanoidStateType.Jumping)
 	end
-
-	return false
 end
 
 --============================================================
---  10. GRASS CACHE BUILDER
+-- 05. CACHE HELPERS
 --============================================================
 
 local function rebuildCache()
@@ -128,10 +107,6 @@ local function rebuildCache()
 	end
 end
 
---============================================================
---  11. SQUARE RANGE CHECK
---============================================================
-
 local function isInsideSquare(part, root, range)
 	local dx = math.abs(part.Position.X - root.Position.X)
 	local dz = math.abs(part.Position.Z - root.Position.Z)
@@ -140,13 +115,37 @@ local function isInsideSquare(part, root, range)
 	return dx <= half and dz <= half
 end
 
+local function findNearestG(range)
+	local root = getRoot()
+	if not root then return nil end
+
+	local folder = Workspace:FindFirstChild("GrassObjects")
+	if not folder then return nil end
+
+	local closest = nil
+	local closestDist = math.huge
+
+	for _, part in ipairs(folder:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name == "g" and part.Parent then
+			if isInsideSquare(part, root, range) then
+				local dist = (part.Position - root.Position).Magnitude
+
+				if dist < closestDist then
+					closestDist = dist
+					closest = part
+				end
+			end
+		end
+	end
+
+	return closest
+end
+
 --============================================================
---  12. TOUCH HANDLER
+-- 06. TOUCH / TELEPORT COLLECTOR
 --============================================================
 
 local function touch(part, root)
-	if stopRequested then return end
-
 	pcall(function()
 		part.CanTouch = true
 		part.CanCollide = false
@@ -155,28 +154,22 @@ local function touch(part, root)
 	end)
 end
 
---============================================================
---  13. OLD METHOD
---  Teleports player to grass, touches it, then returns
---============================================================
-
-local function tpPlayerToGrass(part, root)
-	if stopRequested then return end
-
+local function teleportToPart(part, root)
 	local originalCF = root.CFrame
 
 	pcall(function()
 		root.AssemblyLinearVelocity = Vector3.zero
 		root.AssemblyAngularVelocity = Vector3.zero
-		root.CFrame = CFrame.new(part.Position.X, originalCF.Position.Y, part.Position.Z)
+		root.CFrame = CFrame.new(
+			part.Position.X,
+			originalCF.Position.Y,
+			part.Position.Z
+		)
 	end)
 
-	for i = 1, OLD_TOUCHES do
-		if stopRequested then break end
+	for i = 1, TOUCHES_PER_PART do
 		touch(part, root)
 	end
-
-	if stopRequested then return end
 
 	pcall(function()
 		root.AssemblyLinearVelocity = Vector3.zero
@@ -185,126 +178,16 @@ local function tpPlayerToGrass(part, root)
 	end)
 end
 
---============================================================
---  14. SMART WALK TARGET FINDER
---  Finds the grass inside the largest nearby group
---============================================================
+local function processTeleport(range, modeCheck)
+	local root = getRoot()
+	if not root or type(firetouchinterest) ~= "function" then return end
 
-local function findNearestGrass(root, range)
-	local folder = Workspace:FindFirstChild("GrassObjects")
-	if not folder then return nil end
-
-	local grassParts = {}
-
-	for _, part in ipairs(folder:GetDescendants()) do
-		if part:IsA("BasePart") and part.Name == "g" and isInsideSquare(part, root, range) then
-			table.insert(grassParts, part)
-		end
+	if #cache == 0 then
+		rebuildCache()
 	end
 
-	if #grassParts == 0 then
-		return nil
-	end
-
-	local bestPart = nil
-	local bestScore = -math.huge
-
-	for _, part in ipairs(grassParts) do
-		if part and part.Parent then
-			local groupCount = 0
-
-			for _, other in ipairs(grassParts) do
-				if other and other.Parent then
-					local dist = (other.Position - part.Position).Magnitude
-
-					if dist <= CLUSTER_SCAN_RADIUS then
-						groupCount += 1
-					end
-				end
-			end
-
-			local playerDist = (part.Position - root.Position).Magnitude
-			local score = groupCount - (playerDist * CLUSTER_DISTANCE_WEIGHT)
-
-			if score > bestScore then
-				bestScore = score
-				bestPart = part
-			end
-		end
-	end
-
-	return bestPart
-end
-
---============================================================
---  15. WALK METHOD
---  Forces WalkSpeed to 100 and walks to nearest grass
---============================================================
-
-local function walkPlayerToGrass(root, range)
-	if stopRequested then return end
-
-	local humanoid = getHumanoid()
-	if not humanoid then return end
-
-	local target = findNearestGrass(root, range)
-	if not target then return end
-
-	local startTime = tick()
-
-	humanoid.WalkSpeed = WALK_SPEED
-
-	while target and target.Parent and not stopRequested do
-		local currentRoot = getRoot()
-		local currentHumanoid = getHumanoid()
-
-		if not currentRoot or not currentHumanoid then
-			break
-		end
-
-		currentHumanoid.WalkSpeed = WALK_SPEED
-		currentHumanoid:MoveTo(target.Position)
-
-		local dist = (target.Position - currentRoot.Position).Magnitude
-
-		if dist <= WALK_REACH_DISTANCE then
-			touch(target, currentRoot)
-			break
-		end
-
-		if tick() - startTime >= WALK_TIMEOUT then
-			break
-		end
-
-		task.wait(0.03)
-	end
-
-	if stopRequested then
-		local currentRoot = getRoot()
-		local currentHumanoid = getHumanoid()
-
-		if currentRoot and currentHumanoid then
-			currentHumanoid:MoveTo(currentRoot.Position)
-		end
-	end
-end
-
---============================================================
---  16. MODE PROCESSOR
---============================================================
-
-local function processMode(root, range, walkMode)
-	if stopRequested or not anyModeOn() then return end
-
-	if walkMode then
-		walkPlayerToGrass(root, range)
-		return
-	end
-
-	for i = 1, OLD_BATCH_SIZE do
-		if stopRequested or not anyModeOn() then
-			break
-		end
+	for i = 1, BATCH_SIZE do
+		if not modeCheck() then break end
 
 		if index > #cache then
 			index = 1
@@ -314,102 +197,139 @@ local function processMode(root, range, walkMode)
 		local part = cache[index]
 		index += 1
 
-		if stopRequested or not anyModeOn() then
-			break
-		end
-
-		if part and part.Parent and part:IsA("BasePart") and part.Name == "g" and isInsideSquare(part, root, range) then
-			tpPlayerToGrass(part, root)
+		if part and part.Parent and part:IsA("BasePart") and part.Name == "g" then
+			if isInsideSquare(part, root, range) then
+				teleportToPart(part, root)
+			end
 		end
 	end
 end
 
---============================================================
---  17. MAIN COLLECTION LOOP
---============================================================
-
-local function loop()
-	if running or stopRequested or not anyModeOn() then return end
+local function collectBatch()
+	if running then return end
 	running = true
 
-	local root = getRoot()
-
-	if stopRequested or not root or type(firetouchinterest) ~= "function" then
-		running = false
-		return
+	if tpEnabled then
+		processTeleport(TP_RANGE, function()
+			return tpEnabled
+		end)
 	end
 
-	if #cache == 0 then
-		rebuildCache()
+	if desertEnabled then
+		processTeleport(DESERT_RANGE, function()
+			return desertEnabled
+		end)
 	end
-
-	if stopRequested then running = false return end
-	if modes.w1TpGrass then processMode(root, TP_GRASS_RANGE, false) end
-
-	if stopRequested then running = false return end
-	if modes.w1GrassWalk then processMode(root, WALK_GRASS_RANGE, true) end
-
-	if stopRequested then running = false return end
-	if modes.w2TpGrass then processMode(root, TP_GRASS_RANGE, false) end
-
-	if stopRequested then running = false return end
-	if modes.w2GrassWalk then processMode(root, WALK_GRASS_RANGE, true) end
-
-	if stopRequested then running = false return end
-	if modes.w2Desert then processMode(root, DESERT_RANGE, false) end
-
-	if stopRequested then running = false return end
-	if modes.w2IntersectionWalk then processMode(root, INTERSECTION_RANGE, true) end
 
 	running = false
 end
 
---============================================================
---  18. LOOP STARTER
---============================================================
+local function shouldRun()
+	return tpEnabled or desertEnabled
+end
 
 local function startLoop()
-	stopRequested = false
-
 	if connection then return end
-
 	rebuildCache()
 
 	connection = RunService.Heartbeat:Connect(function()
-		if anyModeOn() and not stopRequested then
-			loop()
+		if shouldRun() then
+			collectBatch()
 		end
 	end)
 end
 
---============================================================
---  19. LOOP STOPPER
---============================================================
-
-local function hardStop()
-	stopRequested = true
-	running = false
-
-	local root = getRoot()
-	local humanoid = getHumanoid()
-
-	if root and humanoid then
-		humanoid:MoveTo(root.Position)
-	end
+local function stopLoopIfNeeded()
+	if shouldRun() then return end
 
 	if connection then
 		connection:Disconnect()
 		connection = nil
 	end
-end
 
-local function stopLoopIfNeeded()
-	if anyModeOn() then return end
-	hardStop()
+	running = false
 end
 
 --============================================================
---  20. UI HELPER FUNCTIONS
+-- 07. WALK COLLECTOR
+--============================================================
+
+local function startWalk()
+	if walkConnection then return end
+
+	local hum = getHumanoid()
+	if hum then
+		originalWalkSpeed = originalWalkSpeed or hum.WalkSpeed
+		hum.WalkSpeed = WALK_SPEED
+		hum.AutoRotate = true
+	end
+
+	walkConnection = RunService.Heartbeat:Connect(function()
+		if not walkEnabled then return end
+
+		local humNow = getHumanoid()
+		local root = getRoot()
+
+		if not humNow or not root then return end
+
+		humNow.WalkSpeed = WALK_SPEED
+		humNow.AutoRotate = true
+
+		if not walkTarget or not walkTarget.Parent then
+			walkTarget = findNearestG(WALK_RANGE)
+		end
+
+		if not walkTarget or not walkTarget.Parent then
+			return
+		end
+
+		if not isInsideSquare(walkTarget, root, WALK_RANGE) then
+			walkTarget = nil
+			return
+		end
+
+		local targetPos = Vector3.new(
+			walkTarget.Position.X,
+			root.Position.Y,
+			walkTarget.Position.Z
+		)
+
+		local distance = (targetPos - root.Position).Magnitude
+
+		if distance <= 5 then
+			touch(walkTarget, root)
+			walkTarget = nil
+			return
+		end
+
+		humNow:MoveTo(targetPos)
+	end)
+end
+
+local function stopWalk()
+	walkEnabled = false
+	walkTarget = nil
+	lastWalkSearch = 0
+
+	if walkConnection then
+		walkConnection:Disconnect()
+		walkConnection = nil
+	end
+
+	local hum = getHumanoid()
+	local root = getRoot()
+
+	if hum and root then
+		hum:MoveTo(root.Position)
+
+		if originalWalkSpeed then
+			hum.WalkSpeed = originalWalkSpeed
+		end
+	end
+end
+
+--============================================================
+-- 08. UI HELPERS
 --============================================================
 
 local function corner(obj, r)
@@ -426,7 +346,7 @@ local function stroke(obj, color, t)
 end
 
 --============================================================
---  21. SCREEN GUI
+-- 09. MAIN UI
 --============================================================
 
 local gui = Instance.new("ScreenGui")
@@ -434,13 +354,8 @@ gui.Name = "GrassCollector"
 gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
---============================================================
---  22. MAIN FRAME
---============================================================
-
 local frame = Instance.new("Frame")
-frame.Name = "Main"
-frame.Size = UDim2.fromOffset(330, 336)
+frame.Size = UDim2.fromOffset(320, 410)
 frame.Position = savedPos
 frame.BackgroundColor3 = Color3.fromRGB(15, 35, 22)
 frame.BorderSizePixel = 0
@@ -448,15 +363,11 @@ frame.Parent = gui
 corner(frame, 14)
 stroke(frame, Color3.fromRGB(70, 180, 95), 2)
 
---============================================================
---  23. TITLE BAR
---============================================================
-
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -82, 0, 30)
-title.Position = UDim2.fromOffset(14, 10)
+title.Size = UDim2.new(1, -82, 0, 34)
+title.Position = UDim2.fromOffset(14, 12)
 title.BackgroundTransparency = 1
-title.Text = "🌱 Grass Cutting Incremental 🌱"
+title.Text = "Grass Cutting Incremental"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextColor3 = Color3.fromRGB(220, 255, 225)
@@ -465,7 +376,7 @@ title.Parent = frame
 
 local minimize = Instance.new("TextButton")
 minimize.Size = UDim2.fromOffset(26, 26)
-minimize.Position = UDim2.new(1, -66, 0, 9)
+minimize.Position = UDim2.new(1, -66, 0, 10)
 minimize.Text = "-"
 minimize.Font = Enum.Font.GothamBold
 minimize.TextSize = 18
@@ -476,7 +387,7 @@ corner(minimize, 8)
 
 local close = Instance.new("TextButton")
 close.Size = UDim2.fromOffset(26, 26)
-close.Position = UDim2.new(1, -34, 0, 9)
+close.Position = UDim2.new(1, -34, 0, 10)
 close.Text = "X"
 close.Font = Enum.Font.GothamBold
 close.TextSize = 14
@@ -486,295 +397,215 @@ close.Parent = frame
 corner(close, 8)
 
 local dragArea = Instance.new("TextButton")
-dragArea.Size = UDim2.new(1, -75, 0, 42)
-dragArea.Position = UDim2.fromOffset(0, 0)
+dragArea.Size = UDim2.new(1, -75, 0, 45)
 dragArea.BackgroundTransparency = 1
 dragArea.Text = ""
 dragArea.Parent = frame
 
---============================================================
---  24. TAB BUTTONS
---============================================================
-
-local tabW1 = Instance.new("TextButton")
-tabW1.Size = UDim2.fromOffset(90, 30)
-tabW1.Position = UDim2.fromOffset(27, 48)
-tabW1.Text = "W1"
-tabW1.Font = Enum.Font.GothamBold
-tabW1.TextSize = 13
-tabW1.Parent = frame
-corner(tabW1, 8)
-
-local tabW2 = Instance.new("TextButton")
-tabW2.Size = UDim2.fromOffset(90, 30)
-tabW2.Position = UDim2.fromOffset(120, 48)
-tabW2.Text = "W2"
-tabW2.Font = Enum.Font.GothamBold
-tabW2.TextSize = 13
-tabW2.Parent = frame
-corner(tabW2, 8)
-
-local tabExtra = Instance.new("TextButton")
-tabExtra.Size = UDim2.fromOffset(90, 30)
-tabExtra.Position = UDim2.fromOffset(213, 48)
-tabExtra.Text = "Extra"
-tabExtra.Font = Enum.Font.GothamBold
-tabExtra.TextSize = 13
-tabExtra.Parent = frame
-corner(tabExtra, 8)
+local divider1 = Instance.new("Frame")
+divider1.Size = UDim2.new(1, -30, 0, 1)
+divider1.Position = UDim2.fromOffset(15, 52)
+divider1.BackgroundColor3 = Color3.fromRGB(70, 180, 95)
+divider1.BorderSizePixel = 0
+divider1.Parent = frame
 
 --============================================================
---  25. PAGE CREATOR
+-- 10. BUTTONS
 --============================================================
 
-local pages = {}
+local tpButton = Instance.new("TextButton")
+tpButton.Size = UDim2.fromOffset(270, 38)
+tpButton.Position = UDim2.fromOffset(25, 70)
+tpButton.Text = "TP Off"
+tpButton.BackgroundColor3 = Color3.fromRGB(75, 65, 35)
+tpButton.TextColor3 = Color3.fromRGB(235, 235, 235)
+tpButton.Font = Enum.Font.GothamBold
+tpButton.TextSize = 16
+tpButton.Parent = frame
+corner(tpButton, 10)
 
-local function makePage(name)
-	local p = Instance.new("Frame")
-	p.Name = name
-	p.Size = UDim2.new(1, -24, 1, -110)
-	p.Position = UDim2.fromOffset(12, 88)
-	p.BackgroundTransparency = 1
-	p.Visible = false
-	p.Parent = frame
+local desertButton = Instance.new("TextButton")
+desertButton.Size = UDim2.fromOffset(270, 38)
+desertButton.Position = UDim2.fromOffset(25, 116)
+desertButton.Text = "Desert Off"
+desertButton.BackgroundColor3 = Color3.fromRGB(55, 70, 55)
+desertButton.TextColor3 = Color3.fromRGB(235, 235, 235)
+desertButton.Font = Enum.Font.GothamBold
+desertButton.TextSize = 16
+desertButton.Parent = frame
+corner(desertButton, 10)
 
-	pages[name] = p
+local walkButton = Instance.new("TextButton")
+walkButton.Size = UDim2.fromOffset(270, 38)
+walkButton.Position = UDim2.fromOffset(25, 164)
+walkButton.Text = "Ghost Walk Off"
+walkButton.BackgroundColor3 = Color3.fromRGB(45, 55, 65)
+walkButton.TextColor3 = Color3.fromRGB(235, 235, 235)
+walkButton.Font = Enum.Font.GothamBold
+walkButton.TextSize = 16
+walkButton.Parent = frame
+corner(walkButton, 10)
 
-	return p
-end
+local ghostWalkNote = Instance.new("TextLabel")
+ghostWalkNote.Size = UDim2.fromOffset(270, 30)
+ghostWalkNote.Position = UDim2.fromOffset(25, 205)
+ghostWalkNote.BackgroundTransparency = 1
+ghostWalkNote.Text = "> Player might walk then stop, it is now ghost walking"
+ghostWalkNote.TextColor3 = Color3.fromRGB(190, 220, 240)
+ghostWalkNote.Font = Enum.Font.Gotham
+ghostWalkNote.TextSize = 11
+ghostWalkNote.TextWrapped = true
+ghostWalkNote.TextXAlignment = Enum.TextXAlignment.Left
+ghostWalkNote.Parent = frame
 
-local w1 = makePage("W1")
-local w2 = makePage("W2")
-local extra = makePage("Extra")
+local github = Instance.new("TextButton")
+github.Size = UDim2.fromOffset(270, 30)
+github.Position = UDim2.fromOffset(25, 242)
+github.Text = "GitHub | ChimeraGaming LuaScripts"
+github.BackgroundColor3 = Color3.fromRGB(25, 45, 32)
+github.TextColor3 = Color3.fromRGB(175, 220, 180)
+github.Font = Enum.Font.GothamBold
+github.TextSize = 12
+github.Parent = frame
+corner(github, 8)
 
---============================================================
---  26. UI ELEMENT BUILDERS
---============================================================
+local iy = Instance.new("TextButton")
+iy.Size = UDim2.fromOffset(270, 30)
+iy.Position = UDim2.fromOffset(25, 280)
+iy.Text = "Load Infinite Yield"
+iy.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+iy.TextColor3 = Color3.fromRGB(220, 220, 255)
+iy.Font = Enum.Font.GothamBold
+iy.TextSize = 12
+iy.Parent = frame
+corner(iy, 8)
 
-local function makeButton(parent, y, text, color)
-	local b = Instance.new("TextButton")
-	b.Size = UDim2.fromOffset(288, 34)
-	b.Position = UDim2.fromOffset(9, y)
-	b.Text = text
-	b.BackgroundColor3 = color
-	b.TextColor3 = Color3.fromRGB(235, 235, 235)
-	b.Font = Enum.Font.GothamBold
-	b.TextSize = 14
-	b.Parent = parent
-	corner(b, 9)
-
-	return b
-end
-
-local function makeNote(parent, y, text, color, h)
-	local n = Instance.new("TextLabel")
-	n.Size = UDim2.fromOffset(288, h or 26)
-	n.Position = UDim2.fromOffset(9, y)
-	n.BackgroundTransparency = 1
-	n.Text = text
-	n.TextColor3 = color
-	n.Font = Enum.Font.Gotham
-	n.TextSize = 10
-	n.TextWrapped = true
-	n.TextYAlignment = Enum.TextYAlignment.Center
-	n.Parent = parent
-
-	return n
-end
-
-local function updateButton(button, onText, offText, active, onColor, offColor)
-	button.Text = active and onText or offText
-	button.BackgroundColor3 = active and onColor or offColor
-end
-
---============================================================
---  27. W1 TAB CONTENT
---============================================================
-
-local w1TpGrass = makeButton(w1, 0, "TP Grass Off", Color3.fromRGB(55, 70, 55))
-makeNote(w1, 36, "This is the old way but can be faster", Color3.fromRGB(175, 220, 180), 24)
-
-local w1GrassWalk = makeButton(w1, 66, "Grass Walk Off", Color3.fromRGB(45, 55, 65))
-makeNote(w1, 102, "Walks to nearest grass with WalkSpeed forced to 100.", Color3.fromRGB(180, 210, 230), 36)
-
---============================================================
---  28. W2 TAB CONTENT
---============================================================
-
-local w2TpGrass = makeButton(w2, 0, "TP Grass Off", Color3.fromRGB(55, 70, 55))
-makeNote(w2, 36, "This is the old way but can be faster", Color3.fromRGB(175, 220, 180), 24)
-
-local w2GrassWalk = makeButton(w2, 66, "Grass Walk Off", Color3.fromRGB(45, 55, 65))
-makeNote(w2, 102, "Walks to nearest grass with WalkSpeed forced to 100.", Color3.fromRGB(180, 210, 230), 36)
-
-local w2Desert = makeButton(w2, 146, "Desert Off", Color3.fromRGB(75, 65, 35))
-makeNote(w2, 182, "Only use in Desert", Color3.fromRGB(230, 205, 120), 24)
-
-local w2IntersectionWalk = makeButton(w2, 214, "Intersection Walk Off", Color3.fromRGB(65, 45, 75))
-makeNote(w2, 250, "Only use this walker in Intersection or your game may break requiring rejoining world to fix.", Color3.fromRGB(235, 160, 180), 40)
-
---============================================================
---  29. EXTRA TAB CONTENT
---============================================================
-
-local github = makeButton(extra, 0, "GitHub | ChimeraGaming LuaScripts", Color3.fromRGB(25, 45, 32))
-local iy = makeButton(extra, 46, "Load Infinite Yield", Color3.fromRGB(35, 35, 45))
-makeNote(extra, 84, "Enable AntiAFK for best results", Color3.fromRGB(200, 200, 255), 26)
+local iyNote = Instance.new("TextLabel")
+iyNote.Size = UDim2.fromOffset(270, 24)
+iyNote.Position = UDim2.fromOffset(25, 316)
+iyNote.BackgroundTransparency = 1
+iyNote.Text = "> Enable AntiAFK for best results"
+iyNote.TextColor3 = Color3.fromRGB(200, 200, 255)
+iyNote.Font = Enum.Font.Gotham
+iyNote.TextSize = 11
+iyNote.TextWrapped = true
+iyNote.Parent = frame
 
 local popup = Instance.new("TextLabel")
-popup.Size = UDim2.fromOffset(288, 28)
-popup.Position = UDim2.fromOffset(9, 116)
+popup.Size = UDim2.fromOffset(270, 26)
+popup.Position = UDim2.fromOffset(25, 342)
 popup.BackgroundColor3 = Color3.fromRGB(35, 75, 45)
 popup.Text = "Copied to clipboard"
 popup.TextColor3 = Color3.fromRGB(220, 255, 225)
 popup.Font = Enum.Font.GothamBold
 popup.TextSize = 12
 popup.Visible = false
-popup.Parent = extra
+popup.Parent = frame
 corner(popup, 8)
 
---============================================================
---  30. CREDIT FOOTER
---============================================================
+local divider2 = Instance.new("Frame")
+divider2.Size = UDim2.new(1, -30, 0, 1)
+divider2.Position = UDim2.fromOffset(15, 372)
+divider2.BackgroundColor3 = Color3.fromRGB(70, 180, 95)
+divider2.BorderSizePixel = 0
+divider2.Parent = frame
 
 local credit = Instance.new("TextLabel")
-credit.Size = UDim2.new(1, -20, 0, 32)
-credit.Position = UDim2.new(0, 10, 1, -39)
+credit.Size = UDim2.new(1, -20, 0, 34)
+credit.Position = UDim2.fromOffset(10, 378)
 credit.BackgroundTransparency = 1
 credit.Text = "Credit | Chimera__Gaming\nFREE AT RSCRIPTS"
 credit.Font = Enum.Font.Gotham
-credit.TextSize = 10
+credit.TextSize = 11
 credit.TextColor3 = Color3.fromRGB(175, 220, 180)
 credit.TextWrapped = true
 credit.Parent = frame
 
 --============================================================
---  31. HEIGHT MAP
+-- 11. BUTTON LOGIC
 --============================================================
 
-local function setFrameHeight(tabName)
-	if tabName == "W1" then
-		frame.Size = UDim2.fromOffset(330, 300)
-		credit.Position = UDim2.new(0, 10, 1, -39)
-	elseif tabName == "W2" then
-		frame.Size = UDim2.fromOffset(330, 424)
-		credit.Position = UDim2.new(0, 10, 1, -39)
-	elseif tabName == "Extra" then
-		frame.Size = UDim2.fromOffset(330, 296)
-		credit.Position = UDim2.new(0, 10, 1, -39)
+local function disableOtherModes(activeMode)
+	if activeMode ~= "tp" then
+		tpEnabled = false
+		tpButton.Text = "TP Off"
+		tpButton.BackgroundColor3 = Color3.fromRGB(75, 65, 35)
 	end
-end
 
---============================================================
---  32. SINGLE MODE LOCK
---============================================================
+	if activeMode ~= "desert" then
+		desertEnabled = false
+		desertButton.Text = "Desert Off"
+		desertButton.BackgroundColor3 = Color3.fromRGB(55, 70, 55)
+	end
 
-local function refreshAllButtons()
-	updateButton(w1TpGrass, "TP Grass On", "TP Grass Off", modes.w1TpGrass, Color3.fromRGB(40, 150, 65), Color3.fromRGB(55, 70, 55))
-	updateButton(w1GrassWalk, "Grass Walk On", "Grass Walk Off", modes.w1GrassWalk, Color3.fromRGB(55, 120, 180), Color3.fromRGB(45, 55, 65))
-
-	updateButton(w2TpGrass, "TP Grass On", "TP Grass Off", modes.w2TpGrass, Color3.fromRGB(40, 150, 65), Color3.fromRGB(55, 70, 55))
-	updateButton(w2GrassWalk, "Grass Walk On", "Grass Walk Off", modes.w2GrassWalk, Color3.fromRGB(55, 120, 180), Color3.fromRGB(45, 55, 65))
-	updateButton(w2Desert, "Desert On", "Desert Off", modes.w2Desert, Color3.fromRGB(150, 120, 40), Color3.fromRGB(75, 65, 35))
-	updateButton(w2IntersectionWalk, "Intersection Walk On", "Intersection Walk Off", modes.w2IntersectionWalk, Color3.fromRGB(130, 70, 160), Color3.fromRGB(65, 45, 75))
-end
-
-local function disableAllModesExcept(modeName)
-	hardStop()
-
-	for k in pairs(modes) do
-		if k ~= modeName then
-			modes[k] = false
+	if activeMode ~= "walk" then
+		if walkEnabled then
+			stopWalk()
 		end
+
+		walkEnabled = false
+		walkButton.Text = "Ghost Walk Off"
+		walkButton.BackgroundColor3 = Color3.fromRGB(45, 55, 65)
 	end
 
-	refreshAllButtons()
+	stopLoopIfNeeded()
 end
 
-local function toggleSingleMode(modeName)
-	local newState = not modes[modeName]
+tpButton.MouseButton1Click:Connect(function()
+	local newState = not tpEnabled
 
-	disableAllModesExcept(modeName)
+	disableOtherModes("tp")
 
-	modes[modeName] = newState
-	refreshAllButtons()
+	tpEnabled = newState
+	tpButton.Text = tpEnabled and "TP On" or "TP Off"
+	tpButton.BackgroundColor3 = tpEnabled and Color3.fromRGB(150, 120, 40) or Color3.fromRGB(75, 65, 35)
 
-	if modes[modeName] then
+	if tpEnabled then
 		startLoop()
 	else
 		stopLoopIfNeeded()
 	end
-end
+end)
 
---============================================================
---  33. TAB SWITCHING
---============================================================
+desertButton.MouseButton1Click:Connect(function()
+	local wasOn = desertEnabled
+	local newState = not desertEnabled
 
-local function showTab(name)
-	currentTab = name
+	disableOtherModes("desert")
 
-	for pageName, page in pairs(pages) do
-		page.Visible = pageName == name
+	desertEnabled = newState
+	desertButton.Text = desertEnabled and "Desert On" or "Desert Off"
+	desertButton.BackgroundColor3 = desertEnabled and Color3.fromRGB(40, 150, 65) or Color3.fromRGB(55, 70, 55)
+
+	if desertEnabled then
+		startLoop()
+	else
+		stopLoopIfNeeded()
+
+		if wasOn then
+			forceJump()
+		end
 	end
-
-	tabW1.BackgroundColor3 = name == "W1" and Color3.fromRGB(40, 150, 65) or Color3.fromRGB(45, 60, 45)
-	tabW2.BackgroundColor3 = name == "W2" and Color3.fromRGB(40, 150, 65) or Color3.fromRGB(45, 60, 45)
-	tabExtra.BackgroundColor3 = name == "Extra" and Color3.fromRGB(40, 150, 65) or Color3.fromRGB(45, 60, 45)
-
-	tabW1.TextColor3 = Color3.fromRGB(235, 255, 235)
-	tabW2.TextColor3 = Color3.fromRGB(235, 255, 235)
-	tabExtra.TextColor3 = Color3.fromRGB(235, 255, 235)
-
-	setFrameHeight(name)
-end
-
-tabW1.MouseButton1Click:Connect(function()
-	showTab("W1")
 end)
 
-tabW2.MouseButton1Click:Connect(function()
-	showTab("W2")
+walkButton.MouseButton1Click:Connect(function()
+	local newState = not walkEnabled
+
+	disableOtherModes("walk")
+
+	walkEnabled = newState
+	walkButton.Text = walkEnabled and "Ghost Walk On" or "Ghost Walk Off"
+	walkButton.BackgroundColor3 = walkEnabled and Color3.fromRGB(55, 120, 180) or Color3.fromRGB(45, 55, 65)
+
+	if walkEnabled then
+		startWalk()
+	else
+		stopWalk()
+	end
 end)
-
-tabExtra.MouseButton1Click:Connect(function()
-	showTab("Extra")
-end)
-
---============================================================
---  34. COLLECTOR BUTTON CLICKS
---============================================================
-
-w1TpGrass.MouseButton1Click:Connect(function()
-	toggleSingleMode("w1TpGrass")
-end)
-
-w1GrassWalk.MouseButton1Click:Connect(function()
-	toggleSingleMode("w1GrassWalk")
-end)
-
-w2TpGrass.MouseButton1Click:Connect(function()
-	toggleSingleMode("w2TpGrass")
-end)
-
-w2GrassWalk.MouseButton1Click:Connect(function()
-	toggleSingleMode("w2GrassWalk")
-end)
-
-w2Desert.MouseButton1Click:Connect(function()
-	toggleSingleMode("w2Desert")
-end)
-
-w2IntersectionWalk.MouseButton1Click:Connect(function()
-	toggleSingleMode("w2IntersectionWalk")
-end)
-
---============================================================
---  35. EXTRA BUTTON CLICKS
---============================================================
 
 github.MouseButton1Click:Connect(function()
 	setclipboard("https://github.com/ChimeraGaming/LuaScripts")
-
 	popup.Visible = true
 
 	task.delay(3, function()
@@ -788,22 +619,24 @@ iy.MouseButton1Click:Connect(function()
 	loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Infinite-Yield-43437"))()
 end)
 
---============================================================
---  36. CLOSE BUTTON
---============================================================
-
 close.MouseButton1Click:Connect(function()
-	hardStop()
+	tpEnabled = false
+	desertEnabled = false
+	walkEnabled = false
 
-	for k in pairs(modes) do
-		modes[k] = false
+	stopLoopIfNeeded()
+	stopWalk()
+
+	if connection then
+		connection:Disconnect()
+		connection = nil
 	end
 
 	gui:Destroy()
 end)
 
 --============================================================
---  37. DRAGGING
+-- 12. DRAG LOGIC
 --============================================================
 
 local dragging = false
@@ -821,7 +654,6 @@ end)
 UIS.InputChanged:Connect(function(i)
 	if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
 		local m = UIS:GetMouseLocation()
-
 		frame.Position = UDim2.new(
 			startPos.X.Scale,
 			startPos.X.Offset + (m.X - dragStart.X),
@@ -833,23 +665,20 @@ end)
 
 UIS.InputEnded:Connect(function(i)
 	if i.UserInputType == Enum.UserInputType.MouseButton1 then
-		if dragging then
-			savedPos = frame.Position
-		end
-
+		if dragging then savedPos = frame.Position end
 		dragging = false
 	end
 end)
 
 --============================================================
---  38. MINIMIZE BUBBLE
+-- 13. MINIMIZE BUBBLE
 --============================================================
 
 local bubble = Instance.new("TextButton")
 bubble.Size = UDim2.fromOffset(52, 52)
 bubble.Position = bubblePos
 bubble.BackgroundColor3 = Color3.fromRGB(15, 35, 22)
-bubble.Text = "🌱"
+bubble.Text = "G"
 bubble.Font = Enum.Font.GothamBold
 bubble.TextSize = 24
 bubble.TextColor3 = Color3.fromRGB(220, 255, 225)
@@ -869,14 +698,10 @@ bubble.MouseButton1Click:Connect(function()
 	frame.Position = bubble.Position
 	frame.Visible = true
 	bubble.Visible = false
-	showTab(currentTab)
 end)
 
 --============================================================
---  39. STARTUP
+-- 14. LOADED
 --============================================================
 
-refreshAllButtons()
-showTab("W1")
-
-print("Grass Collector Tabs Loaded")
+print("Grass Collector Simplified Loaded")
