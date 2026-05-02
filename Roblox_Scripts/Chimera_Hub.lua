@@ -41,8 +41,8 @@ local tabs = {
 
 	Tools = {
 		{ Name = "💾 World Saver", File = "World_Saver.lua" },
-		{ Name = "Simple UI for copying player coordinates", File = "Simple_Copy_Cords.lua" },
 		{ Name = "⌛Anti AFK", File = "Anti_AFK.lua" },
+		{ Name = "Simple UI for copying player coordinates", File = "Simple_Copy_Cords.lua" },
 		{
 			Name = "Infinite Yield",
 			Custom = function()
@@ -53,10 +53,10 @@ local tabs = {
 
 	Credit = {
 		{
-			Name = "Open GitHub Repo",
+			Name = "Copy GitHub Link",
 			Custom = function()
 				setclipboard("https://github.com/ChimeraGaming/LuaScripts")
-				print("GitHub link copied to clipboard")
+				print("[Chimera Hub] GitHub link copied")
 			end
 		}
 	}
@@ -189,13 +189,14 @@ local function clearScriptButtons()
 	for _, b in ipairs(scriptButtons) do
 		b:Destroy()
 	end
+
 	table.clear(scriptButtons)
 end
 
 local function updateTabColors(g, t, c)
-	g.BackgroundColor3 = activeTab == "Games" and Color3.fromRGB(40,70,105) or Color3.fromRGB(30,45,70)
-	t.BackgroundColor3 = activeTab == "Tools" and Color3.fromRGB(40,70,105) or Color3.fromRGB(30,45,70)
-	c.BackgroundColor3 = activeTab == "Credit" and Color3.fromRGB(40,70,105) or Color3.fromRGB(30,45,70)
+	g.BackgroundColor3 = activeTab == "Games" and Color3.fromRGB(40, 70, 105) or Color3.fromRGB(30, 45, 70)
+	t.BackgroundColor3 = activeTab == "Tools" and Color3.fromRGB(40, 70, 105) or Color3.fromRGB(30, 45, 70)
+	c.BackgroundColor3 = activeTab == "Credit" and Color3.fromRGB(40, 70, 105) or Color3.fromRGB(30, 45, 70)
 end
 
 local function renderTab(tabName, g, t, c)
@@ -218,6 +219,7 @@ local function renderTab(tabName, g, t, c)
 
 		local btn = createButton(item.Name, y, callback)
 		table.insert(scriptButtons, btn)
+
 		y += 45
 	end
 
@@ -244,11 +246,12 @@ creditTab.Position = UDim2.fromOffset(240, 55)
 creditTab.Text = "Credit"
 creditTab.Parent = frame
 
-for _, btn in ipairs({gamesTab, toolsTab, creditTab}) do
+for _, btn in ipairs({ gamesTab, toolsTab, creditTab }) do
 	btn.Font = Enum.Font.GothamBold
 	btn.TextSize = 14
-	btn.BackgroundColor3 = Color3.fromRGB(30,45,70)
-	btn.TextColor3 = Color3.fromRGB(235,245,255)
+	btn.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
+	btn.TextColor3 = Color3.fromRGB(235, 245, 255)
+
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
 end
 
@@ -265,13 +268,13 @@ creditTab.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
--- INIT
+-- 12. INIT
 --============================================================
 
 renderTab("Games", gamesTab, toolsTab, creditTab)
 
 --============================================================
--- DRAGGING
+-- 13. DRAGGING
 --============================================================
 
 local dragging = false
@@ -306,7 +309,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --============================================================
--- LOADED
+-- 14. LOADED
 --============================================================
 
 print("[Chimera Hub] Loaded")
