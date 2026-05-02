@@ -42,6 +42,7 @@ local tabs = {
 	Tools = {
 		{ Name = "💾 World Saver", File = "World_Saver.lua" },
 		{ Name = "⌛Anti AFK", File = "Anti_AFK.lua" },
+		{ Name = "📁Dex Explorer", File = "Dex_Explorer_V2.lua" },
 		{ Name = "Simple UI for copying player coordinates", File = "Simple_Copy_Cords.lua" },
 		{
 			Name = "Infinite Yield",
@@ -189,7 +190,6 @@ local function clearScriptButtons()
 	for _, b in ipairs(scriptButtons) do
 		b:Destroy()
 	end
-
 	table.clear(scriptButtons)
 end
 
@@ -207,15 +207,9 @@ local function renderTab(tabName, g, t, c)
 	local y = 105
 
 	for _, item in ipairs(tabs[tabName]) do
-		local callback
-
-		if item.File then
-			callback = function()
-				loadScript(item.File)
-			end
-		else
-			callback = item.Custom
-		end
+		local callback = item.File and function()
+			loadScript(item.File)
+		end or item.Custom
 
 		local btn = createButton(item.Name, y, callback)
 		table.insert(scriptButtons, btn)
@@ -251,7 +245,6 @@ for _, btn in ipairs({ gamesTab, toolsTab, creditTab }) do
 	btn.TextSize = 14
 	btn.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
 	btn.TextColor3 = Color3.fromRGB(235, 245, 255)
-
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
 end
 
