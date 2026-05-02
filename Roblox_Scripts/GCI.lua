@@ -34,6 +34,10 @@ local WALK_RECHECK_DELAY = 0
 local BATCH_SIZE = 120
 local TOUCHES_PER_PART = 1
 
+local RANGE_LEVEL = 1
+local RANGE_MIN = 1
+local RANGE_MAX = 100
+
 --============================================================
 -- 03. STATE
 --============================================================
@@ -49,6 +53,9 @@ local walkConnection = nil
 local walkTarget = nil
 local originalWalkSpeed = nil
 local lastWalkSearch = 0
+
+local rangeEnforceConnection = nil
+local originalCollectorData = {}
 
 local cache = {}
 local index = 1
@@ -90,7 +97,90 @@ local function forceJump()
 end
 
 --============================================================
--- 05. CACHE HELPERS
+-- 05. COLLECTOR RANGE HELPERS
+--============================================================
+
+local function getCollectorFolder()
+	return Workspace:FindFirstChild("GrassCollider")
+end
+
+local function saveOriginalCollectorData(part)
+	if originalCollectorData[part] then return end
+
+	originalCollectorData[part] = {
+		Size = part.Size,
+		CanTouch = part.CanTouch,
+		CanCollide = part.CanCollide,
+		Transparency = part.Transparency,
+		Massless = part.Massless
+	}
+end
+
+local function applyCollectorPart(part)
+	if not part or not part:IsA("BasePart") then return end
+
+	saveOriginalCollectorData(part)
+
+	local original = originalCollectorData[part]
+	local scale = RANGE_LEVEL
+
+	part.Size = Vector3.new(
+		original.Size.X * scale,
+		original.Size.Y,
+		original.Size.Z * scale
+	)
+
+	part.CanTouch = true
+	part.CanCollide = false
+	part.Massless = true
+end
+
+local function updateCollectorSize()
+	local folder = getCollectorFolder()
+	if not folder then return end
+
+	if folder:IsA("BasePart") then
+		applyCollectorPart(folder)
+	end
+
+	for _, obj in ipairs(folder:GetDescendants()) do
+		if obj:IsA("BasePart") then
+			applyCollectorPart(obj)
+		end
+	end
+end
+
+local function startRangeEnforcer()
+	if rangeEnforceConnection then return end
+
+	rangeEnforceConnection = RunService.Heartbeat:Connect(function()
+		updateCollectorSize()
+	end)
+end
+
+local function stopRangeEnforcer()
+	if rangeEnforceConnection then
+		rangeEnforceConnection:Disconnect()
+		rangeEnforceConnection = nil
+	end
+end
+
+local function resetCollectorSize()
+	stopRangeEnforcer()
+
+	for part, data in pairs(originalCollectorData) do
+		if part and part.Parent and part:IsA("BasePart") then
+			part.Size = data.Size
+			part.CanTouch = data.CanTouch
+			part.CanCollide = data.CanCollide
+			part.Transparency = data.Transparency
+			part.Massless = data.Massless
+		end
+	end
+end
+
+--============================================================
+-- 06. CACHE HELPERS
 --============================================================
 
 local function rebuildCache()
@@ -142,7 +232,7 @@ local function findNearestG(range)
 end
 
 --============================================================
--- 06. TOUCH / TELEPORT COLLECTOR
+-- 07. TOUCH / TELEPORT COLLECTOR
 --============================================================
 
 local function touch(part, root)
@@ -251,7 +341,7 @@ local function stopLoopIfNeeded()
 end
 
 --============================================================
--- 07. WALK COLLECTOR
+-- 08. WALK COLLECTOR
 --============================================================
 
 local function startWalk()
@@ -329,7 +419,7 @@ local function stopWalk()
 end
 
 --============================================================
--- 08. UI HELPERS
+-- 09. UI HELPERS
 --============================================================
 
 local function corner(obj, r)
@@ -346,7 +436,7 @@ local function stroke(obj, color, t)
 end
 
 --============================================================
--- 09. MAIN UI
+-- 10. MAIN UI
 --============================================================
 
 local gui = Instance.new("ScreenGui")
@@ -355,7 +445,7 @@ gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(320, 410)
+frame.Size = UDim2.fromOffset(320, 480)
 frame.Position = savedPos
 frame.BackgroundColor3 = Color3.fromRGB(15, 35, 22)
 frame.BorderSizePixel = 0
@@ -410,7 +500,7 @@ divider1.BorderSizePixel = 0
 divider1.Parent = frame
 
 --============================================================
--- 10. BUTTONS
+-- 11. BUTTONS
 --============================================================
 
 local tpButton = Instance.new("TextButton")
@@ -450,7 +540,7 @@ local ghostWalkNote = Instance.new("TextLabel")
 ghostWalkNote.Size = UDim2.fromOffset(270, 30)
 ghostWalkNote.Position = UDim2.fromOffset(25, 205)
 ghostWalkNote.BackgroundTransparency = 1
-ghostWalkNote.Text = "> Player might walk then stop, it is now ghost walking"
+ghostWalkNote.Text = "> Enables walking while standing still"
 ghostWalkNote.TextColor3 = Color3.fromRGB(190, 220, 240)
 ghostWalkNote.Font = Enum.Font.Gotham
 ghostWalkNote.TextSize = 11
@@ -458,9 +548,100 @@ ghostWalkNote.TextWrapped = true
 ghostWalkNote.TextXAlignment = Enum.TextXAlignment.Left
 ghostWalkNote.Parent = frame
 
+--============================================================
+-- 12. RANGE SLIDER
+--============================================================
+
+local rangeLabel = Instance.new("TextLabel")
+rangeLabel.Size = UDim2.fromOffset(270, 20)
+rangeLabel.Position = UDim2.fromOffset(25, 242)
+rangeLabel.BackgroundTransparency = 1
+rangeLabel.Text = "Collector Range: " .. RANGE_LEVEL .. " / 100"
+rangeLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
+rangeLabel.Font = Enum.Font.GothamBold
+rangeLabel.TextSize = 12
+rangeLabel.TextXAlignment = Enum.TextXAlignment.Left
+rangeLabel.Parent = frame
+
+local rangeSlider = Instance.new("TextButton")
+rangeSlider.Size = UDim2.fromOffset(270, 22)
+rangeSlider.Position = UDim2.fromOffset(25, 266)
+rangeSlider.BackgroundColor3 = Color3.fromRGB(35, 75, 45)
+rangeSlider.Text = ""
+rangeSlider.AutoButtonColor = false
+rangeSlider.Parent = frame
+corner(rangeSlider, 8)
+
+local sliderFill = Instance.new("Frame")
+sliderFill.Size = UDim2.new(RANGE_LEVEL / RANGE_MAX, 0, 1, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(120, 220, 140)
+sliderFill.BorderSizePixel = 0
+sliderFill.Parent = rangeSlider
+corner(sliderFill, 8)
+
+local sliderKnob = Instance.new("Frame")
+sliderKnob.Size = UDim2.fromOffset(14, 28)
+sliderKnob.Position = UDim2.new(RANGE_LEVEL / RANGE_MAX, -7, 0.5, -14)
+sliderKnob.BackgroundColor3 = Color3.fromRGB(220, 255, 225)
+sliderKnob.BorderSizePixel = 0
+sliderKnob.Parent = rangeSlider
+corner(sliderKnob, 7)
+
+local rangeNote = Instance.new("TextLabel")
+rangeNote.Size = UDim2.fromOffset(270, 28)
+rangeNote.Position = UDim2.fromOffset(25, 292)
+rangeNote.BackgroundTransparency = 1
+rangeNote.Text = "> Adjusts every BasePart inside Workspace > GrassCollider"
+rangeNote.TextColor3 = Color3.fromRGB(190, 230, 190)
+rangeNote.Font = Enum.Font.Gotham
+rangeNote.TextSize = 11
+rangeNote.TextWrapped = true
+rangeNote.TextXAlignment = Enum.TextXAlignment.Left
+rangeNote.Parent = frame
+
+local sliding = false
+
+local function setRangeFromMouse()
+	local mouse = UIS:GetMouseLocation()
+	local rel = (mouse.X - rangeSlider.AbsolutePosition.X) / rangeSlider.AbsoluteSize.X
+
+	rel = math.clamp(rel, 0, 1)
+
+	local newLevel = math.floor(rel * (RANGE_MAX - RANGE_MIN) + RANGE_MIN + 0.5)
+	newLevel = math.clamp(newLevel, RANGE_MIN, RANGE_MAX)
+
+	RANGE_LEVEL = newLevel
+
+	local percent = RANGE_LEVEL / RANGE_MAX
+
+	sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+	sliderKnob.Position = UDim2.new(percent, -7, 0.5, -14)
+	rangeLabel.Text = "Collector Range: " .. RANGE_LEVEL .. " / 100"
+
+	updateCollectorSize()
+end
+
+rangeSlider.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		sliding = true
+		setRangeFromMouse()
+	end
+end)
+
+sliderKnob.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		sliding = true
+		setRangeFromMouse()
+	end
+end)
+
+--============================================================
+-- 13. EXTRA BUTTONS
+--============================================================
+
 local github = Instance.new("TextButton")
 github.Size = UDim2.fromOffset(270, 30)
-github.Position = UDim2.fromOffset(25, 242)
+github.Position = UDim2.fromOffset(25, 328)
 github.Text = "GitHub | ChimeraGaming LuaScripts"
 github.BackgroundColor3 = Color3.fromRGB(25, 45, 32)
 github.TextColor3 = Color3.fromRGB(175, 220, 180)
@@ -471,7 +652,7 @@ corner(github, 8)
 
 local iy = Instance.new("TextButton")
 iy.Size = UDim2.fromOffset(270, 30)
-iy.Position = UDim2.fromOffset(25, 280)
+iy.Position = UDim2.fromOffset(25, 366)
 iy.Text = "Load Infinite Yield"
 iy.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 iy.TextColor3 = Color3.fromRGB(220, 220, 255)
@@ -482,7 +663,7 @@ corner(iy, 8)
 
 local iyNote = Instance.new("TextLabel")
 iyNote.Size = UDim2.fromOffset(270, 24)
-iyNote.Position = UDim2.fromOffset(25, 316)
+iyNote.Position = UDim2.fromOffset(25, 402)
 iyNote.BackgroundTransparency = 1
 iyNote.Text = "> Enable AntiAFK for best results"
 iyNote.TextColor3 = Color3.fromRGB(200, 200, 255)
@@ -493,7 +674,7 @@ iyNote.Parent = frame
 
 local popup = Instance.new("TextLabel")
 popup.Size = UDim2.fromOffset(270, 26)
-popup.Position = UDim2.fromOffset(25, 342)
+popup.Position = UDim2.fromOffset(25, 428)
 popup.BackgroundColor3 = Color3.fromRGB(35, 75, 45)
 popup.Text = "Copied to clipboard"
 popup.TextColor3 = Color3.fromRGB(220, 255, 225)
@@ -505,24 +686,24 @@ corner(popup, 8)
 
 local divider2 = Instance.new("Frame")
 divider2.Size = UDim2.new(1, -30, 0, 1)
-divider2.Position = UDim2.fromOffset(15, 372)
+divider2.Position = UDim2.fromOffset(15, 456)
 divider2.BackgroundColor3 = Color3.fromRGB(70, 180, 95)
 divider2.BorderSizePixel = 0
 divider2.Parent = frame
 
 local credit = Instance.new("TextLabel")
-credit.Size = UDim2.new(1, -20, 0, 34)
-credit.Position = UDim2.fromOffset(10, 378)
+credit.Size = UDim2.new(1, -20, 0, 22)
+credit.Position = UDim2.fromOffset(10, 458)
 credit.BackgroundTransparency = 1
-credit.Text = "Credit | Chimera__Gaming\nFREE AT RSCRIPTS"
+credit.Text = "Credit | Chimera__Gaming | FREE AT RSCRIPTS"
 credit.Font = Enum.Font.Gotham
-credit.TextSize = 11
+credit.TextSize = 10
 credit.TextColor3 = Color3.fromRGB(175, 220, 180)
 credit.TextWrapped = true
 credit.Parent = frame
 
 --============================================================
--- 11. BUTTON LOGIC
+-- 14. BUTTON LOGIC
 --============================================================
 
 local function disableOtherModes(activeMode)
@@ -626,6 +807,7 @@ close.MouseButton1Click:Connect(function()
 
 	stopLoopIfNeeded()
 	stopWalk()
+	resetCollectorSize()
 
 	if connection then
 		connection:Disconnect()
@@ -636,7 +818,7 @@ close.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
--- 12. DRAG LOGIC
+-- 15. DRAG LOGIC
 --============================================================
 
 local dragging = false
@@ -661,17 +843,23 @@ UIS.InputChanged:Connect(function(i)
 			startPos.Y.Offset + (m.Y - dragStart.Y)
 		)
 	end
+
+	if sliding and i.UserInputType == Enum.UserInputType.MouseMovement then
+		setRangeFromMouse()
+	end
 end)
 
 UIS.InputEnded:Connect(function(i)
 	if i.UserInputType == Enum.UserInputType.MouseButton1 then
 		if dragging then savedPos = frame.Position end
+
 		dragging = false
+		sliding = false
 	end
 end)
 
 --============================================================
--- 13. MINIMIZE BUBBLE
+-- 16. MINIMIZE BUBBLE
 --============================================================
 
 local bubble = Instance.new("TextButton")
@@ -701,7 +889,10 @@ bubble.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
--- 14. LOADED
+-- 17. LOADED
 --============================================================
 
-print("Grass Collector Simplified Loaded")
+updateCollectorSize()
+startRangeEnforcer()
+
+print("Grass Collector Loaded")
