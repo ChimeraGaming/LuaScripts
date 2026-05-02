@@ -51,12 +51,16 @@ local scripts = {
 		File = "Moon_Incremental.lua"
 	},
 	{
-		Name = "Simple UI for copying player coordinates",
-		File = "Simple_Copy_Cords.lua"
-	},
-	{
 		Name = "[🌎] Space Incremental",
 		File = "Space_Incremental.lua"
+	},
+	{
+		Name = "💾 World Saver",
+		File = "World_Saver.lua"
+	},
+	{
+		Name = "Simple UI for copying player coordinates",
+		File = "Simple_Copy_Cords.lua"
 	}
 }
 
@@ -75,8 +79,8 @@ gui.Parent = PlayerGui
 --============================================================
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(340, 430)
-frame.Position = UDim2.new(0.5, -170, 0.5, -215)
+frame.Size = UDim2.fromOffset(340, 475)
+frame.Position = UDim2.new(0.5, -170, 0.5, -237)
 frame.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
 frame.BorderSizePixel = 0
 frame.Parent = gui
@@ -155,10 +159,16 @@ local function loadScript(fileName)
 		return game:HttpGet(url)
 	end)
 
-	if success and result then
-		loadstring(result)()
+	if success and result and result ~= "" then
+		local loaded, err = pcall(function()
+			loadstring(result)()
+		end)
+
+		if not loaded then
+			warn("[Chimera Hub] Script error:", fileName, err)
+		end
 	else
-		warn("Failed to load: " .. url)
+		warn("[Chimera Hub] Failed to load:", fileName)
 	end
 end
 
