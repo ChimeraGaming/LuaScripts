@@ -83,8 +83,8 @@ gui.Parent = PlayerGui
 --============================================================
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(360, 430)
-frame.Position = UDim2.new(0.5, -180, 0.5, -215)
+frame.Size = UDim2.fromOffset(360, 520)
+frame.Position = UDim2.new(0.5, -180, 0.5, -260)
 frame.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
 frame.BorderSizePixel = 0
 frame.Parent = gui
@@ -109,6 +109,7 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 18
 title.TextColor3 = Color3.fromRGB(220, 240, 255)
 title.TextXAlignment = Enum.TextXAlignment.Left
+title.ZIndex = 3
 title.Parent = frame
 
 --============================================================
@@ -123,6 +124,7 @@ close.Font = Enum.Font.GothamBold
 close.TextSize = 14
 close.BackgroundColor3 = Color3.fromRGB(80, 25, 35)
 close.TextColor3 = Color3.fromRGB(255, 160, 160)
+close.ZIndex = 4
 close.Parent = frame
 
 Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
@@ -144,6 +146,7 @@ local function createButton(text, y, callback)
 	button.TextSize = 14
 	button.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
 	button.TextColor3 = Color3.fromRGB(235, 245, 255)
+	button.ZIndex = 2
 	button.Parent = frame
 
 	Instance.new("UICorner", button).CornerRadius = UDim.new(0, 10)
@@ -158,14 +161,18 @@ end
 --============================================================
 
 local creditFooter = Instance.new("TextLabel")
-creditFooter.Size = UDim2.new(1, -24, 0, 44)
-creditFooter.Position = UDim2.new(0, 12, 1, -52)
+creditFooter.Name = "CreditFooter"
+creditFooter.Size = UDim2.new(1, -24, 0, 46)
+creditFooter.Position = UDim2.new(0, 12, 1, -58)
 creditFooter.BackgroundTransparency = 1
 creditFooter.Text = "Credit | Chimera__Gaming\n" .. GITHUB_LINK
 creditFooter.Font = Enum.Font.Gotham
 creditFooter.TextSize = 12
 creditFooter.TextColor3 = Color3.fromRGB(160, 210, 235)
 creditFooter.TextWrapped = true
+creditFooter.TextXAlignment = Enum.TextXAlignment.Center
+creditFooter.TextYAlignment = Enum.TextYAlignment.Center
+creditFooter.ZIndex = 5
 creditFooter.Parent = frame
 
 --============================================================
@@ -201,10 +208,12 @@ local scriptButtons = {}
 
 local function resizeFrameForTab(tabName)
 	local count = #tabs[tabName]
-	local height = 170 + (count * 45) + 55
+	local height = 200 + (count * 45) + 70
 
 	frame.Size = UDim2.fromOffset(360, height)
 	frame.Position = UDim2.new(0.5, -180, 0.5, -(height / 2))
+
+	creditFooter.Position = UDim2.new(0, 12, 1, -58)
 end
 
 local function clearScriptButtons()
@@ -239,6 +248,8 @@ local function renderTab(tabName, g, t, c)
 		y += 45
 	end
 
+	creditFooter.Visible = true
+	creditFooter.ZIndex = 5
 	updateTabColors(g, t, c)
 end
 
@@ -250,6 +261,7 @@ local gamesTab = Instance.new("TextButton")
 gamesTab.Size = UDim2.fromOffset(105, 34)
 gamesTab.Position = UDim2.fromOffset(20, 55)
 gamesTab.Text = "Games"
+gamesTab.ZIndex = 3
 gamesTab.Parent = frame
 
 local toolsTab = gamesTab:Clone()
