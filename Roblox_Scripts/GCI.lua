@@ -24,80 +24,23 @@ if old then old:Destroy() end
 -- 02. SETTINGS
 --============================================================
 
-local TP_RANGE = 150
-local DESERT_RANGE = 850
-
-local WALK_RANGE = 850
-local WALK_SPEED = 50
-local WALK_RECHECK_DELAY = 0
-
-local BATCH_SIZE = 120
-local TOUCHES_PER_PART = 1
-
 local RANGE_LEVEL = 1
 local RANGE_MIN = 1
 local RANGE_MAX = 100
+local RANGE_ENABLED = false
 
 --============================================================
 -- 03. STATE
 --============================================================
 
-local tpEnabled = false
-local desertEnabled = false
-local walkEnabled = false
-
-local connection = nil
-local running = false
-
-local walkConnection = nil
-local walkTarget = nil
-local originalWalkSpeed = nil
-local lastWalkSearch = 0
-
 local rangeEnforceConnection = nil
 local originalCollectorData = {}
-
-local cache = {}
-local index = 1
 
 local savedPos = UDim2.fromOffset(120, 120)
 local bubblePos = UDim2.fromOffset(120, 120)
 
 --============================================================
--- 04. CHARACTER HELPERS
---============================================================
-
-local function getChar()
-	return Player.Character
-end
-
-local function getRoot()
-	local char = getChar()
-	if not char then return nil end
-
-	return char:FindFirstChild("HumanoidRootPart")
-		or char:FindFirstChild("UpperTorso")
-		or char:FindFirstChild("Torso")
-end
-
-local function getHumanoid()
-	local char = getChar()
-	if not char then return nil end
-
-	return char:FindFirstChildOfClass("Humanoid")
-end
-
-local function forceJump()
-	local hum = getHumanoid()
-
-	if hum then
-		hum.Jump = true
-		hum:ChangeState(Enum.HumanoidStateType.Jumping)
-	end
-end
-
---============================================================
--- 05. COLLECTOR RANGE HELPERS
+-- 04. COLLECTOR RANGE HELPERS
 --============================================================
 
 local function getCollectorFolder()
@@ -122,12 +65,11 @@ local function applyCollectorPart(part)
 	saveOriginalCollectorData(part)
 
 	local original = originalCollectorData[part]
-	local scale = RANGE_LEVEL
 
 	part.Size = Vector3.new(
-		original.Size.X * scale,
+		original.Size.X * RANGE_LEVEL,
 		original.Size.Y,
-		original.Size.Z * scale
+		original.Size.Z * RANGE_LEVEL
 	)
 
 	part.CanTouch = true
@@ -154,7 +96,9 @@ local function startRangeEnforcer()
 	if rangeEnforceConnection then return end
 
 	rangeEnforceConnection = RunService.Heartbeat:Connect(function()
-		updateCollectorSize()
+		if RANGE_ENABLED then
+			updateCollectorSize()
+		end
 	end)
 end
 
@@ -166,8 +110,6 @@ local function stopRangeEnforcer()
 end
 
 local function resetCollectorSize()
-	stopRangeEnforcer()
-
 	for part, data in pairs(originalCollectorData) do
 		if part and part.Parent and part:IsA("BasePart") then
 			part.Size = data.Size
@@ -180,246 +122,7 @@ local function resetCollectorSize()
 end
 
 --============================================================
--- 06. CACHE HELPERS
---============================================================
-
-local function rebuildCache()
-	cache = {}
-	index = 1
-
-	local folder = Workspace:FindFirstChild("GrassObjects")
-	if not folder then return end
-
-	for _, v in ipairs(folder:GetDescendants()) do
-		if v:IsA("BasePart") and v.Name == "g" then
-			table.insert(cache, v)
-		end
-	end
-end
-
-local function isInsideSquare(part, root, range)
-	local dx = math.abs(part.Position.X - root.Position.X)
-	local dz = math.abs(part.Position.Z - root.Position.Z)
-	local half = range / 2
-
-	return dx <= half and dz <= half
-end
-
-local function findNearestG(range)
-	local root = getRoot()
-	if not root then return nil end
-
-	local folder = Workspace:FindFirstChild("GrassObjects")
-	if not folder then return nil end
-
-	local closest = nil
-	local closestDist = math.huge
-
-	for _, part in ipairs(folder:GetDescendants()) do
-		if part:IsA("BasePart") and part.Name == "g" and part.Parent then
-			if isInsideSquare(part, root, range) then
-				local dist = (part.Position - root.Position).Magnitude
-
-				if dist < closestDist then
-					closestDist = dist
-					closest = part
-				end
-			end
-		end
-	end
-
-	return closest
-end
-
---============================================================
--- 07. TOUCH / TELEPORT COLLECTOR
---============================================================
-
-local function touch(part, root)
-	pcall(function()
-		part.CanTouch = true
-		part.CanCollide = false
-		firetouchinterest(root, part, 0)
-		firetouchinterest(root, part, 1)
-	end)
-end
-
-local function teleportToPart(part, root)
-	local originalCF = root.CFrame
-
-	pcall(function()
-		root.AssemblyLinearVelocity = Vector3.zero
-		root.AssemblyAngularVelocity = Vector3.zero
-		root.CFrame = CFrame.new(
-			part.Position.X,
-			originalCF.Position.Y,
-			part.Position.Z
-		)
-	end)
-
-	for i = 1, TOUCHES_PER_PART do
-		touch(part, root)
-	end
-
-	pcall(function()
-		root.AssemblyLinearVelocity = Vector3.zero
-		root.AssemblyAngularVelocity = Vector3.zero
-		root.CFrame = originalCF
-	end)
-end
-
-local function processTeleport(range, modeCheck)
-	local root = getRoot()
-	if not root or type(firetouchinterest) ~= "function" then return end
-
-	if #cache == 0 then
-		rebuildCache()
-	end
-
-	for i = 1, BATCH_SIZE do
-		if not modeCheck() then break end
-
-		if index > #cache then
-			index = 1
-			rebuildCache()
-		end
-
-		local part = cache[index]
-		index += 1
-
-		if part and part.Parent and part:IsA("BasePart") and part.Name == "g" then
-			if isInsideSquare(part, root, range) then
-				teleportToPart(part, root)
-			end
-		end
-	end
-end
-
-local function collectBatch()
-	if running then return end
-	running = true
-
-	if tpEnabled then
-		processTeleport(TP_RANGE, function()
-			return tpEnabled
-		end)
-	end
-
-	if desertEnabled then
-		processTeleport(DESERT_RANGE, function()
-			return desertEnabled
-		end)
-	end
-
-	running = false
-end
-
-local function shouldRun()
-	return tpEnabled or desertEnabled
-end
-
-local function startLoop()
-	if connection then return end
-	rebuildCache()
-
-	connection = RunService.Heartbeat:Connect(function()
-		if shouldRun() then
-			collectBatch()
-		end
-	end)
-end
-
-local function stopLoopIfNeeded()
-	if shouldRun() then return end
-
-	if connection then
-		connection:Disconnect()
-		connection = nil
-	end
-
-	running = false
-end
-
---============================================================
--- 08. WALK COLLECTOR
---============================================================
-
-local function startWalk()
-	if walkConnection then return end
-
-	local hum = getHumanoid()
-	if hum then
-		originalWalkSpeed = originalWalkSpeed or hum.WalkSpeed
-		hum.WalkSpeed = WALK_SPEED
-		hum.AutoRotate = true
-	end
-
-	walkConnection = RunService.Heartbeat:Connect(function()
-		if not walkEnabled then return end
-
-		local humNow = getHumanoid()
-		local root = getRoot()
-
-		if not humNow or not root then return end
-
-		humNow.WalkSpeed = WALK_SPEED
-		humNow.AutoRotate = true
-
-		if not walkTarget or not walkTarget.Parent then
-			walkTarget = findNearestG(WALK_RANGE)
-		end
-
-		if not walkTarget or not walkTarget.Parent then
-			return
-		end
-
-		if not isInsideSquare(walkTarget, root, WALK_RANGE) then
-			walkTarget = nil
-			return
-		end
-
-		local targetPos = Vector3.new(
-			walkTarget.Position.X,
-			root.Position.Y,
-			walkTarget.Position.Z
-		)
-
-		local distance = (targetPos - root.Position).Magnitude
-
-		if distance <= 5 then
-			touch(walkTarget, root)
-			walkTarget = nil
-			return
-		end
-
-		humNow:MoveTo(targetPos)
-	end)
-end
-
-local function stopWalk()
-	walkEnabled = false
-	walkTarget = nil
-	lastWalkSearch = 0
-
-	if walkConnection then
-		walkConnection:Disconnect()
-		walkConnection = nil
-	end
-
-	local hum = getHumanoid()
-	local root = getRoot()
-
-	if hum and root then
-		hum:MoveTo(root.Position)
-
-		if originalWalkSpeed then
-			hum.WalkSpeed = originalWalkSpeed
-		end
-	end
-end
-
---============================================================
--- 09. UI HELPERS
+-- 05. UI HELPERS
 --============================================================
 
 local function corner(obj, r)
@@ -436,7 +139,7 @@ local function stroke(obj, color, t)
 end
 
 --============================================================
--- 10. MAIN UI
+-- 06. MAIN UI
 --============================================================
 
 local gui = Instance.new("ScreenGui")
@@ -445,7 +148,7 @@ gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(320, 480)
+frame.Size = UDim2.fromOffset(320, 280)
 frame.Position = savedPos
 frame.BackgroundColor3 = Color3.fromRGB(15, 35, 22)
 frame.BorderSizePixel = 0
@@ -500,61 +203,12 @@ divider1.BorderSizePixel = 0
 divider1.Parent = frame
 
 --============================================================
--- 11. BUTTONS
---============================================================
-
-local tpButton = Instance.new("TextButton")
-tpButton.Size = UDim2.fromOffset(270, 38)
-tpButton.Position = UDim2.fromOffset(25, 70)
-tpButton.Text = "TP Off"
-tpButton.BackgroundColor3 = Color3.fromRGB(75, 65, 35)
-tpButton.TextColor3 = Color3.fromRGB(235, 235, 235)
-tpButton.Font = Enum.Font.GothamBold
-tpButton.TextSize = 16
-tpButton.Parent = frame
-corner(tpButton, 10)
-
-local desertButton = Instance.new("TextButton")
-desertButton.Size = UDim2.fromOffset(270, 38)
-desertButton.Position = UDim2.fromOffset(25, 116)
-desertButton.Text = "Desert Off"
-desertButton.BackgroundColor3 = Color3.fromRGB(55, 70, 55)
-desertButton.TextColor3 = Color3.fromRGB(235, 235, 235)
-desertButton.Font = Enum.Font.GothamBold
-desertButton.TextSize = 16
-desertButton.Parent = frame
-corner(desertButton, 10)
-
-local walkButton = Instance.new("TextButton")
-walkButton.Size = UDim2.fromOffset(270, 38)
-walkButton.Position = UDim2.fromOffset(25, 164)
-walkButton.Text = "Ghost Walk Off"
-walkButton.BackgroundColor3 = Color3.fromRGB(45, 55, 65)
-walkButton.TextColor3 = Color3.fromRGB(235, 235, 235)
-walkButton.Font = Enum.Font.GothamBold
-walkButton.TextSize = 16
-walkButton.Parent = frame
-corner(walkButton, 10)
-
-local ghostWalkNote = Instance.new("TextLabel")
-ghostWalkNote.Size = UDim2.fromOffset(270, 30)
-ghostWalkNote.Position = UDim2.fromOffset(25, 205)
-ghostWalkNote.BackgroundTransparency = 1
-ghostWalkNote.Text = "> Enables walking while standing still"
-ghostWalkNote.TextColor3 = Color3.fromRGB(190, 220, 240)
-ghostWalkNote.Font = Enum.Font.Gotham
-ghostWalkNote.TextSize = 11
-ghostWalkNote.TextWrapped = true
-ghostWalkNote.TextXAlignment = Enum.TextXAlignment.Left
-ghostWalkNote.Parent = frame
-
---============================================================
--- 12. RANGE SLIDER
+-- 07. RANGE SLIDER + RADIAL TOGGLE
 --============================================================
 
 local rangeLabel = Instance.new("TextLabel")
 rangeLabel.Size = UDim2.fromOffset(270, 20)
-rangeLabel.Position = UDim2.fromOffset(25, 242)
+rangeLabel.Position = UDim2.fromOffset(25, 85)
 rangeLabel.BackgroundTransparency = 1
 rangeLabel.Text = "Collector Range: " .. RANGE_LEVEL .. " / 100"
 rangeLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
@@ -564,8 +218,8 @@ rangeLabel.TextXAlignment = Enum.TextXAlignment.Left
 rangeLabel.Parent = frame
 
 local rangeSlider = Instance.new("TextButton")
-rangeSlider.Size = UDim2.fromOffset(270, 22)
-rangeSlider.Position = UDim2.fromOffset(25, 266)
+rangeSlider.Size = UDim2.fromOffset(215, 22)
+rangeSlider.Position = UDim2.fromOffset(25, 110)
 rangeSlider.BackgroundColor3 = Color3.fromRGB(35, 75, 45)
 rangeSlider.Text = ""
 rangeSlider.AutoButtonColor = false
@@ -587,19 +241,49 @@ sliderKnob.BorderSizePixel = 0
 sliderKnob.Parent = rangeSlider
 corner(sliderKnob, 7)
 
-local rangeNote = Instance.new("TextLabel")
-rangeNote.Size = UDim2.fromOffset(270, 28)
-rangeNote.Position = UDim2.fromOffset(25, 292)
-rangeNote.BackgroundTransparency = 1
-rangeNote.Text = "> Adjusts every BasePart inside Workspace > GrassCollider"
-rangeNote.TextColor3 = Color3.fromRGB(190, 230, 190)
-rangeNote.Font = Enum.Font.Gotham
-rangeNote.TextSize = 11
-rangeNote.TextWrapped = true
-rangeNote.TextXAlignment = Enum.TextXAlignment.Left
-rangeNote.Parent = frame
+local radialButton = Instance.new("TextButton")
+radialButton.Size = UDim2.fromOffset(28, 28)
+radialButton.Position = UDim2.fromOffset(265, 107)
+radialButton.BackgroundColor3 = Color3.fromRGB(35, 65, 42)
+radialButton.Text = ""
+radialButton.AutoButtonColor = false
+radialButton.Parent = frame
+corner(radialButton, 14)
+stroke(radialButton, Color3.fromRGB(70, 180, 95), 2)
+
+local radialDot = Instance.new("Frame")
+radialDot.Size = UDim2.fromOffset(14, 14)
+radialDot.Position = UDim2.fromOffset(7, 7)
+radialDot.BackgroundColor3 = Color3.fromRGB(120, 220, 140)
+radialDot.BorderSizePixel = 0
+radialDot.Visible = false
+radialDot.Parent = radialButton
+corner(radialDot, 7)
 
 local sliding = false
+
+local function refreshRangeToggle()
+	if RANGE_ENABLED then
+		radialButton.BackgroundColor3 = Color3.fromRGB(45, 120, 65)
+		radialDot.Visible = true
+	else
+		radialButton.BackgroundColor3 = Color3.fromRGB(35, 65, 42)
+		radialDot.Visible = false
+	end
+end
+
+local function toggleCollectorRange()
+	RANGE_ENABLED = not RANGE_ENABLED
+
+	if RANGE_ENABLED then
+		updateCollectorSize()
+		startRangeEnforcer()
+	else
+		resetCollectorSize()
+	end
+
+	refreshRangeToggle()
+end
 
 local function setRangeFromMouse()
 	local mouse = UIS:GetMouseLocation()
@@ -618,7 +302,9 @@ local function setRangeFromMouse()
 	sliderKnob.Position = UDim2.new(percent, -7, 0.5, -14)
 	rangeLabel.Text = "Collector Range: " .. RANGE_LEVEL .. " / 100"
 
-	updateCollectorSize()
+	if RANGE_ENABLED then
+		updateCollectorSize()
+	end
 end
 
 rangeSlider.InputBegan:Connect(function(input)
@@ -635,13 +321,15 @@ sliderKnob.InputBegan:Connect(function(input)
 	end
 end)
 
+radialButton.MouseButton1Click:Connect(toggleCollectorRange)
+
 --============================================================
--- 13. EXTRA BUTTONS
+-- 08. EXTRA BUTTONS
 --============================================================
 
 local github = Instance.new("TextButton")
 github.Size = UDim2.fromOffset(270, 30)
-github.Position = UDim2.fromOffset(25, 328)
+github.Position = UDim2.fromOffset(25, 150)
 github.Text = "GitHub | ChimeraGaming LuaScripts"
 github.BackgroundColor3 = Color3.fromRGB(25, 45, 32)
 github.TextColor3 = Color3.fromRGB(175, 220, 180)
@@ -652,7 +340,7 @@ corner(github, 8)
 
 local iy = Instance.new("TextButton")
 iy.Size = UDim2.fromOffset(270, 30)
-iy.Position = UDim2.fromOffset(25, 366)
+iy.Position = UDim2.fromOffset(25, 188)
 iy.Text = "Load Infinite Yield"
 iy.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 iy.TextColor3 = Color3.fromRGB(220, 220, 255)
@@ -663,7 +351,7 @@ corner(iy, 8)
 
 local iyNote = Instance.new("TextLabel")
 iyNote.Size = UDim2.fromOffset(270, 24)
-iyNote.Position = UDim2.fromOffset(25, 402)
+iyNote.Position = UDim2.fromOffset(25, 224)
 iyNote.BackgroundTransparency = 1
 iyNote.Text = "> Enable AntiAFK for best results"
 iyNote.TextColor3 = Color3.fromRGB(200, 200, 255)
@@ -674,7 +362,7 @@ iyNote.Parent = frame
 
 local popup = Instance.new("TextLabel")
 popup.Size = UDim2.fromOffset(270, 26)
-popup.Position = UDim2.fromOffset(25, 428)
+popup.Position = UDim2.fromOffset(25, 224)
 popup.BackgroundColor3 = Color3.fromRGB(35, 75, 45)
 popup.Text = "Copied to clipboard"
 popup.TextColor3 = Color3.fromRGB(220, 255, 225)
@@ -686,14 +374,14 @@ corner(popup, 8)
 
 local divider2 = Instance.new("Frame")
 divider2.Size = UDim2.new(1, -30, 0, 1)
-divider2.Position = UDim2.fromOffset(15, 456)
+divider2.Position = UDim2.fromOffset(15, 250)
 divider2.BackgroundColor3 = Color3.fromRGB(70, 180, 95)
 divider2.BorderSizePixel = 0
 divider2.Parent = frame
 
 local credit = Instance.new("TextLabel")
 credit.Size = UDim2.new(1, -20, 0, 22)
-credit.Position = UDim2.fromOffset(10, 458)
+credit.Position = UDim2.fromOffset(10, 254)
 credit.BackgroundTransparency = 1
 credit.Text = "Credit | Chimera__Gaming | FREE AT RSCRIPTS"
 credit.Font = Enum.Font.Gotham
@@ -703,87 +391,8 @@ credit.TextWrapped = true
 credit.Parent = frame
 
 --============================================================
--- 14. BUTTON LOGIC
+-- 09. BUTTON LOGIC
 --============================================================
-
-local function disableOtherModes(activeMode)
-	if activeMode ~= "tp" then
-		tpEnabled = false
-		tpButton.Text = "TP Off"
-		tpButton.BackgroundColor3 = Color3.fromRGB(75, 65, 35)
-	end
-
-	if activeMode ~= "desert" then
-		desertEnabled = false
-		desertButton.Text = "Desert Off"
-		desertButton.BackgroundColor3 = Color3.fromRGB(55, 70, 55)
-	end
-
-	if activeMode ~= "walk" then
-		if walkEnabled then
-			stopWalk()
-		end
-
-		walkEnabled = false
-		walkButton.Text = "Ghost Walk Off"
-		walkButton.BackgroundColor3 = Color3.fromRGB(45, 55, 65)
-	end
-
-	stopLoopIfNeeded()
-end
-
-tpButton.MouseButton1Click:Connect(function()
-	local newState = not tpEnabled
-
-	disableOtherModes("tp")
-
-	tpEnabled = newState
-	tpButton.Text = tpEnabled and "TP On" or "TP Off"
-	tpButton.BackgroundColor3 = tpEnabled and Color3.fromRGB(150, 120, 40) or Color3.fromRGB(75, 65, 35)
-
-	if tpEnabled then
-		startLoop()
-	else
-		stopLoopIfNeeded()
-	end
-end)
-
-desertButton.MouseButton1Click:Connect(function()
-	local wasOn = desertEnabled
-	local newState = not desertEnabled
-
-	disableOtherModes("desert")
-
-	desertEnabled = newState
-	desertButton.Text = desertEnabled and "Desert On" or "Desert Off"
-	desertButton.BackgroundColor3 = desertEnabled and Color3.fromRGB(40, 150, 65) or Color3.fromRGB(55, 70, 55)
-
-	if desertEnabled then
-		startLoop()
-	else
-		stopLoopIfNeeded()
-
-		if wasOn then
-			forceJump()
-		end
-	end
-end)
-
-walkButton.MouseButton1Click:Connect(function()
-	local newState = not walkEnabled
-
-	disableOtherModes("walk")
-
-	walkEnabled = newState
-	walkButton.Text = walkEnabled and "Ghost Walk On" or "Ghost Walk Off"
-	walkButton.BackgroundColor3 = walkEnabled and Color3.fromRGB(55, 120, 180) or Color3.fromRGB(45, 55, 65)
-
-	if walkEnabled then
-		startWalk()
-	else
-		stopWalk()
-	end
-end)
 
 github.MouseButton1Click:Connect(function()
 	setclipboard("https://github.com/ChimeraGaming/LuaScripts")
@@ -801,24 +410,14 @@ iy.MouseButton1Click:Connect(function()
 end)
 
 close.MouseButton1Click:Connect(function()
-	tpEnabled = false
-	desertEnabled = false
-	walkEnabled = false
-
-	stopLoopIfNeeded()
-	stopWalk()
+	RANGE_ENABLED = false
+	stopRangeEnforcer()
 	resetCollectorSize()
-
-	if connection then
-		connection:Disconnect()
-		connection = nil
-	end
-
 	gui:Destroy()
 end)
 
 --============================================================
--- 15. DRAG LOGIC
+-- 10. DRAG LOGIC
 --============================================================
 
 local dragging = false
@@ -851,7 +450,9 @@ end)
 
 UIS.InputEnded:Connect(function(i)
 	if i.UserInputType == Enum.UserInputType.MouseButton1 then
-		if dragging then savedPos = frame.Position end
+		if dragging then
+			savedPos = frame.Position
+		end
 
 		dragging = false
 		sliding = false
@@ -859,7 +460,7 @@ UIS.InputEnded:Connect(function(i)
 end)
 
 --============================================================
--- 16. MINIMIZE BUBBLE
+-- 11. MINIMIZE BUBBLE
 --============================================================
 
 local bubble = Instance.new("TextButton")
@@ -889,10 +490,10 @@ bubble.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
--- 17. LOADED
+-- 12. LOADED
 --============================================================
 
-updateCollectorSize()
+refreshRangeToggle()
 startRangeEnforcer()
 
 print("Grass Collector Loaded")
