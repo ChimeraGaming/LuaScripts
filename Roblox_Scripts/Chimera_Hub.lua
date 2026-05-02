@@ -42,6 +42,7 @@ local tabs = {
 	Tools = {
 		{ Name = "💾 World Saver", File = "World_Saver.lua" },
 		{ Name = "Simple UI for copying player coordinates", File = "Simple_Copy_Cords.lua" },
+		{ Name = "⌛Anti AFK", File = "Anti_AFK.lua" },
 		{
 			Name = "Infinite Yield",
 			Custom = function()
