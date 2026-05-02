@@ -28,6 +28,7 @@ end
 --============================================================
 
 local BASE = "https://raw.githubusercontent.com/ChimeraGaming/LuaScripts/main/Roblox_Scripts/"
+local GITHUB_LINK = "https://github.com/ChimeraGaming/LuaScripts"
 
 local tabs = {
 	Games = {
@@ -56,8 +57,12 @@ local tabs = {
 		{
 			Name = "Copy GitHub Link",
 			Custom = function()
-				setclipboard("https://github.com/ChimeraGaming/LuaScripts")
-				print("[Chimera Hub] GitHub link copied")
+				if setclipboard then
+					setclipboard(GITHUB_LINK)
+					print("[Chimera Hub] GitHub link copied")
+				else
+					print("[Chimera Hub] GitHub:", GITHUB_LINK)
+				end
 			end
 		}
 	}
@@ -86,9 +91,10 @@ frame.Parent = gui
 
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 14)
 
-local stroke = Instance.new("UIStroke", frame)
+local stroke = Instance.new("UIStroke")
 stroke.Color = Color3.fromRGB(0, 200, 255)
 stroke.Thickness = 2
+stroke.Parent = frame
 
 --============================================================
 -- 06. TITLE
@@ -148,7 +154,22 @@ local function createButton(text, y, callback)
 end
 
 --============================================================
--- 09. LOAD SCRIPT HELPER
+-- 09. CREDIT FOOTER
+--============================================================
+
+local creditFooter = Instance.new("TextLabel")
+creditFooter.Size = UDim2.new(1, -24, 0, 44)
+creditFooter.Position = UDim2.new(0, 12, 1, -52)
+creditFooter.BackgroundTransparency = 1
+creditFooter.Text = "Credit | Chimera__Gaming\n" .. GITHUB_LINK
+creditFooter.Font = Enum.Font.Gotham
+creditFooter.TextSize = 12
+creditFooter.TextColor3 = Color3.fromRGB(160, 210, 235)
+creditFooter.TextWrapped = true
+creditFooter.Parent = frame
+
+--============================================================
+-- 10. LOAD SCRIPT HELPER
 --============================================================
 
 local function loadScript(fileName)
@@ -172,7 +193,7 @@ local function loadScript(fileName)
 end
 
 --============================================================
--- 10. TABS SYSTEM
+-- 11. TABS SYSTEM
 --============================================================
 
 local activeTab = "Games"
@@ -180,7 +201,7 @@ local scriptButtons = {}
 
 local function resizeFrameForTab(tabName)
 	local count = #tabs[tabName]
-	local height = 130 + (count * 45) + 70
+	local height = 170 + (count * 45) + 55
 
 	frame.Size = UDim2.fromOffset(360, height)
 	frame.Position = UDim2.new(0.5, -180, 0.5, -(height / 2))
@@ -190,6 +211,7 @@ local function clearScriptButtons()
 	for _, b in ipairs(scriptButtons) do
 		b:Destroy()
 	end
+
 	table.clear(scriptButtons)
 end
 
@@ -221,7 +243,7 @@ local function renderTab(tabName, g, t, c)
 end
 
 --============================================================
--- 11. TAB BUTTONS
+-- 12. TAB BUTTONS
 --============================================================
 
 local gamesTab = Instance.new("TextButton")
@@ -245,6 +267,7 @@ for _, btn in ipairs({ gamesTab, toolsTab, creditTab }) do
 	btn.TextSize = 14
 	btn.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
 	btn.TextColor3 = Color3.fromRGB(235, 245, 255)
+
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
 end
 
@@ -261,13 +284,13 @@ creditTab.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
--- 12. INIT
+-- 13. INIT
 --============================================================
 
 renderTab("Games", gamesTab, toolsTab, creditTab)
 
 --============================================================
--- 13. DRAGGING
+-- 14. DRAGGING
 --============================================================
 
 local dragging = false
@@ -302,7 +325,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --============================================================
--- 14. LOADED
+-- 15. LOADED
 --============================================================
 
 print("[Chimera Hub] Loaded")
