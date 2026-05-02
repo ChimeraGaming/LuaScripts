@@ -1,8 +1,5 @@
 --============================================================
--- Grass Collector
--- Grass Cutting Incremental
--- Credit | Chimera__Gaming
--- FREE AT RSCRIPTS
+-- Grass Collector UI
 --============================================================
 
 --============================================================
@@ -29,117 +26,88 @@ local RANGE_MIN = 1
 local RANGE_MAX = 100
 local RANGE_ENABLED = false
 
+local BG = "https://www.roblox.com/asset-thumbnail/image?assetId=100488071891852&width=420&height=420&format=png"
+
 --============================================================
 -- 03. STATE
 --============================================================
 
-local rangeEnforceConnection = nil
-local originalCollectorData = {}
+local connection
+local original = {}
 
-local savedPos = UDim2.fromOffset(120, 120)
-local bubblePos = UDim2.fromOffset(120, 120)
+local dragging = false
+local dragStart
+local startPos
+local dragMoved = false
+local minimizedDragMoved = false
+
+local minimized = false
+local savedNormalPosition = UDim2.fromOffset(120, 120)
+local savedMinimizedPosition = UDim2.fromOffset(120, 120)
 
 --============================================================
--- 04. COLLECTOR RANGE HELPERS
+-- 04. COLLECTOR LOGIC
 --============================================================
 
-local function getCollectorFolder()
+local function getFolder()
 	return Workspace:FindFirstChild("GrassCollider")
 end
 
-local function saveOriginalCollectorData(part)
-	if originalCollectorData[part] then return end
+local function save(part)
+	if original[part] then return end
 
-	originalCollectorData[part] = {
-		Size = part.Size,
-		CanTouch = part.CanTouch,
-		CanCollide = part.CanCollide,
-		Transparency = part.Transparency,
-		Massless = part.Massless
+	original[part] = {
+		Size = part.Size
 	}
 end
 
-local function applyCollectorPart(part)
-	if not part or not part:IsA("BasePart") then return end
+local function apply(part)
+	if not part:IsA("BasePart") then return end
 
-	saveOriginalCollectorData(part)
+	save(part)
 
-	local original = originalCollectorData[part]
+	local base = original[part]
 
 	part.Size = Vector3.new(
-		original.Size.X * RANGE_LEVEL,
-		original.Size.Y,
-		original.Size.Z * RANGE_LEVEL
+		base.Size.X * RANGE_LEVEL,
+		base.Size.Y,
+		base.Size.Z * RANGE_LEVEL
 	)
 
 	part.CanTouch = true
 	part.CanCollide = false
-	part.Massless = true
 end
 
-local function updateCollectorSize()
-	local folder = getCollectorFolder()
+local function update()
+	local folder = getFolder()
 	if not folder then return end
 
-	if folder:IsA("BasePart") then
-		applyCollectorPart(folder)
-	end
-
-	for _, obj in ipairs(folder:GetDescendants()) do
-		if obj:IsA("BasePart") then
-			applyCollectorPart(obj)
+	for _, v in ipairs(folder:GetDescendants()) do
+		if v:IsA("BasePart") then
+			apply(v)
 		end
 	end
 end
 
-local function startRangeEnforcer()
-	if rangeEnforceConnection then return end
+local function start()
+	if connection then return end
 
-	rangeEnforceConnection = RunService.Heartbeat:Connect(function()
+	connection = RunService.Heartbeat:Connect(function()
 		if RANGE_ENABLED then
-			updateCollectorSize()
+			update()
 		end
 	end)
 end
 
-local function stopRangeEnforcer()
-	if rangeEnforceConnection then
-		rangeEnforceConnection:Disconnect()
-		rangeEnforceConnection = nil
-	end
-end
-
-local function resetCollectorSize()
-	for part, data in pairs(originalCollectorData) do
-		if part and part.Parent and part:IsA("BasePart") then
-			part.Size = data.Size
-			part.CanTouch = data.CanTouch
-			part.CanCollide = data.CanCollide
-			part.Transparency = data.Transparency
-			part.Massless = data.Massless
-		end
+local function stop()
+	if connection then
+		connection:Disconnect()
+		connection = nil
 	end
 end
 
 --============================================================
--- 05. UI HELPERS
---============================================================
-
-local function corner(obj, r)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, r)
-	c.Parent = obj
-end
-
-local function stroke(obj, color, t)
-	local s = Instance.new("UIStroke")
-	s.Color = color
-	s.Thickness = t
-	s.Parent = obj
-end
-
---============================================================
--- 06. MAIN UI
+-- 05. ROOT GUI
 --============================================================
 
 local gui = Instance.new("ScreenGui")
@@ -148,352 +116,396 @@ gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(320, 280)
-frame.Position = savedPos
-frame.BackgroundColor3 = Color3.fromRGB(15, 35, 22)
-frame.BorderSizePixel = 0
+frame.Size = UDim2.fromOffset(340, 300)
+frame.Position = savedNormalPosition
+frame.BackgroundTransparency = 1
 frame.Parent = gui
-corner(frame, 14)
-stroke(frame, Color3.fromRGB(70, 180, 95), 2)
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -82, 0, 34)
-title.Position = UDim2.fromOffset(14, 12)
-title.BackgroundTransparency = 1
-title.Text = "Grass Cutting Incremental"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 14
-title.TextColor3 = Color3.fromRGB(220, 255, 225)
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = frame
-
-local minimize = Instance.new("TextButton")
-minimize.Size = UDim2.fromOffset(26, 26)
-minimize.Position = UDim2.new(1, -66, 0, 10)
-minimize.Text = "-"
-minimize.Font = Enum.Font.GothamBold
-minimize.TextSize = 18
-minimize.BackgroundColor3 = Color3.fromRGB(35, 75, 45)
-minimize.TextColor3 = Color3.fromRGB(180, 255, 190)
-minimize.Parent = frame
-corner(minimize, 8)
-
-local close = Instance.new("TextButton")
-close.Size = UDim2.fromOffset(26, 26)
-close.Position = UDim2.new(1, -34, 0, 10)
-close.Text = "X"
-close.Font = Enum.Font.GothamBold
-close.TextSize = 14
-close.BackgroundColor3 = Color3.fromRGB(80, 25, 25)
-close.TextColor3 = Color3.fromRGB(255, 150, 150)
-close.Parent = frame
-corner(close, 8)
-
-local dragArea = Instance.new("TextButton")
-dragArea.Size = UDim2.new(1, -75, 0, 45)
-dragArea.BackgroundTransparency = 1
-dragArea.Text = ""
-dragArea.Parent = frame
-
-local divider1 = Instance.new("Frame")
-divider1.Size = UDim2.new(1, -30, 0, 1)
-divider1.Position = UDim2.fromOffset(15, 52)
-divider1.BackgroundColor3 = Color3.fromRGB(70, 180, 95)
-divider1.BorderSizePixel = 0
-divider1.Parent = frame
+local bg = Instance.new("ImageLabel")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundTransparency = 1
+bg.Image = BG
+bg.ScaleType = Enum.ScaleType.Stretch
+bg.Parent = frame
 
 --============================================================
--- 07. RANGE SLIDER + RADIAL TOGGLE
+-- 06. RANGE LABEL
 --============================================================
 
-local rangeLabel = Instance.new("TextLabel")
-rangeLabel.Size = UDim2.fromOffset(270, 20)
-rangeLabel.Position = UDim2.fromOffset(25, 85)
-rangeLabel.BackgroundTransparency = 1
-rangeLabel.Text = "Collector Range: " .. RANGE_LEVEL .. " / 100"
-rangeLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
-rangeLabel.Font = Enum.Font.GothamBold
-rangeLabel.TextSize = 12
-rangeLabel.TextXAlignment = Enum.TextXAlignment.Left
-rangeLabel.Parent = frame
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, -40, 0, 24)
+label.Position = UDim2.fromOffset(20, 76)
+label.BackgroundTransparency = 1
+label.Text = "Collector Range: 1/100"
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.25
+label.Font = Enum.Font.GothamBold
+label.TextSize = 14
+label.Parent = frame
 
-local rangeSlider = Instance.new("TextButton")
-rangeSlider.Size = UDim2.fromOffset(215, 22)
-rangeSlider.Position = UDim2.fromOffset(25, 110)
-rangeSlider.BackgroundColor3 = Color3.fromRGB(35, 75, 45)
-rangeSlider.Text = ""
-rangeSlider.AutoButtonColor = false
-rangeSlider.Parent = frame
-corner(rangeSlider, 8)
+--============================================================
+-- 07. RANGE BAR
+--============================================================
 
-local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new(RANGE_LEVEL / RANGE_MAX, 0, 1, 0)
-sliderFill.BackgroundColor3 = Color3.fromRGB(120, 220, 140)
-sliderFill.BorderSizePixel = 0
-sliderFill.Parent = rangeSlider
-corner(sliderFill, 8)
+local barBack = Instance.new("Frame")
+barBack.Size = UDim2.fromOffset(225, 18)
+barBack.Position = UDim2.fromOffset(25, 112)
+barBack.BackgroundColor3 = Color3.fromRGB(28, 80, 38)
+barBack.BorderSizePixel = 0
+barBack.Parent = frame
 
-local sliderKnob = Instance.new("Frame")
-sliderKnob.Size = UDim2.fromOffset(14, 28)
-sliderKnob.Position = UDim2.new(RANGE_LEVEL / RANGE_MAX, -7, 0.5, -14)
-sliderKnob.BackgroundColor3 = Color3.fromRGB(220, 255, 225)
-sliderKnob.BorderSizePixel = 0
-sliderKnob.Parent = rangeSlider
-corner(sliderKnob, 7)
+local barBackCorner = Instance.new("UICorner")
+barBackCorner.CornerRadius = UDim.new(0, 9)
+barBackCorner.Parent = barBack
 
-local radialButton = Instance.new("TextButton")
-radialButton.Size = UDim2.fromOffset(28, 28)
-radialButton.Position = UDim2.fromOffset(265, 107)
-radialButton.BackgroundColor3 = Color3.fromRGB(35, 65, 42)
-radialButton.Text = ""
-radialButton.AutoButtonColor = false
-radialButton.Parent = frame
-corner(radialButton, 14)
-stroke(radialButton, Color3.fromRGB(70, 180, 95), 2)
+local fill = Instance.new("Frame")
+fill.Size = UDim2.fromOffset(8, 18)
+fill.BackgroundColor3 = Color3.fromRGB(125, 240, 100)
+fill.BorderSizePixel = 0
+fill.Parent = barBack
 
-local radialDot = Instance.new("Frame")
-radialDot.Size = UDim2.fromOffset(14, 14)
-radialDot.Position = UDim2.fromOffset(7, 7)
-radialDot.BackgroundColor3 = Color3.fromRGB(120, 220, 140)
-radialDot.BorderSizePixel = 0
-radialDot.Visible = false
-radialDot.Parent = radialButton
-corner(radialDot, 7)
+local fillCorner = Instance.new("UICorner")
+fillCorner.CornerRadius = UDim.new(0, 9)
+fillCorner.Parent = fill
 
-local sliding = false
+local knob = Instance.new("Frame")
+knob.Size = UDim2.fromOffset(18, 28)
+knob.Position = UDim2.fromOffset(0, -5)
+knob.BackgroundColor3 = Color3.fromRGB(245, 255, 245)
+knob.BorderSizePixel = 0
+knob.Parent = barBack
 
-local function refreshRangeToggle()
-	if RANGE_ENABLED then
-		radialButton.BackgroundColor3 = Color3.fromRGB(45, 120, 65)
-		radialDot.Visible = true
-	else
-		radialButton.BackgroundColor3 = Color3.fromRGB(35, 65, 42)
-		radialDot.Visible = false
-	end
-end
+local knobCorner = Instance.new("UICorner")
+knobCorner.CornerRadius = UDim.new(0, 9)
+knobCorner.Parent = knob
 
-local function toggleCollectorRange()
+local knobStroke = Instance.new("UIStroke")
+knobStroke.Color = Color3.fromRGB(25, 80, 30)
+knobStroke.Thickness = 2
+knobStroke.Parent = knob
+
+--============================================================
+-- 08. RANGE TOGGLE
+--============================================================
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.fromOffset(34, 34)
+toggle.Position = UDim2.fromOffset(270, 104)
+toggle.Text = ""
+toggle.BackgroundColor3 = Color3.fromRGB(45, 135, 55)
+toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggle.Font = Enum.Font.GothamBlack
+toggle.TextSize = 24
+toggle.BorderSizePixel = 0
+toggle.Parent = frame
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggle
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = Color3.fromRGB(15, 70, 20)
+toggleStroke.Thickness = 2
+toggleStroke.Parent = toggle
+
+toggle.MouseButton1Click:Connect(function()
 	RANGE_ENABLED = not RANGE_ENABLED
 
 	if RANGE_ENABLED then
-		updateCollectorSize()
-		startRangeEnforcer()
+		toggle.Text = "✓"
+		toggle.BackgroundColor3 = Color3.fromRGB(70, 190, 75)
+		start()
 	else
-		resetCollectorSize()
+		toggle.Text = ""
+		toggle.BackgroundColor3 = Color3.fromRGB(45, 135, 55)
+		stop()
+	end
+end)
+
+--============================================================
+-- 09. SLIDER LOGIC
+--============================================================
+
+local sliding = false
+
+local function setRangeFromX(x)
+	local percent = math.clamp(
+		(x - barBack.AbsolutePosition.X) / barBack.AbsoluteSize.X,
+		0,
+		1
+	)
+
+	RANGE_LEVEL = math.floor(percent * RANGE_MAX)
+	if RANGE_LEVEL < RANGE_MIN then
+		RANGE_LEVEL = RANGE_MIN
 	end
 
-	refreshRangeToggle()
+	local fillWidth = math.clamp(percent * barBack.AbsoluteSize.X, 8, barBack.AbsoluteSize.X)
+
+	fill.Size = UDim2.fromOffset(fillWidth, 18)
+	knob.Position = UDim2.fromOffset(fillWidth - 9, -5)
+
+	label.Text = "Collector Range: " .. RANGE_LEVEL .. "/100"
 end
 
-local function setRangeFromMouse()
-	local mouse = UIS:GetMouseLocation()
-	local rel = (mouse.X - rangeSlider.AbsolutePosition.X) / rangeSlider.AbsoluteSize.X
-
-	rel = math.clamp(rel, 0, 1)
-
-	local newLevel = math.floor(rel * (RANGE_MAX - RANGE_MIN) + RANGE_MIN + 0.5)
-	newLevel = math.clamp(newLevel, RANGE_MIN, RANGE_MAX)
-
-	RANGE_LEVEL = newLevel
-
-	local percent = RANGE_LEVEL / RANGE_MAX
-
-	sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-	sliderKnob.Position = UDim2.new(percent, -7, 0.5, -14)
-	rangeLabel.Text = "Collector Range: " .. RANGE_LEVEL .. " / 100"
-
-	if RANGE_ENABLED then
-		updateCollectorSize()
-	end
-end
-
-rangeSlider.InputBegan:Connect(function(input)
+barBack.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		sliding = true
-		setRangeFromMouse()
+		setRangeFromX(input.Position.X)
 	end
 end)
 
-sliderKnob.InputBegan:Connect(function(input)
+knob.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		sliding = true
-		setRangeFromMouse()
 	end
 end)
 
-radialButton.MouseButton1Click:Connect(toggleCollectorRange)
-
---============================================================
--- 08. EXTRA BUTTONS
---============================================================
-
-local github = Instance.new("TextButton")
-github.Size = UDim2.fromOffset(270, 30)
-github.Position = UDim2.fromOffset(25, 150)
-github.Text = "GitHub | ChimeraGaming LuaScripts"
-github.BackgroundColor3 = Color3.fromRGB(25, 45, 32)
-github.TextColor3 = Color3.fromRGB(175, 220, 180)
-github.Font = Enum.Font.GothamBold
-github.TextSize = 12
-github.Parent = frame
-corner(github, 8)
-
-local iy = Instance.new("TextButton")
-iy.Size = UDim2.fromOffset(270, 30)
-iy.Position = UDim2.fromOffset(25, 188)
-iy.Text = "Load Infinite Yield"
-iy.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-iy.TextColor3 = Color3.fromRGB(220, 220, 255)
-iy.Font = Enum.Font.GothamBold
-iy.TextSize = 12
-iy.Parent = frame
-corner(iy, 8)
-
-local iyNote = Instance.new("TextLabel")
-iyNote.Size = UDim2.fromOffset(270, 24)
-iyNote.Position = UDim2.fromOffset(25, 224)
-iyNote.BackgroundTransparency = 1
-iyNote.Text = "> Enable AntiAFK for best results"
-iyNote.TextColor3 = Color3.fromRGB(200, 200, 255)
-iyNote.Font = Enum.Font.Gotham
-iyNote.TextSize = 11
-iyNote.TextWrapped = true
-iyNote.Parent = frame
-
-local popup = Instance.new("TextLabel")
-popup.Size = UDim2.fromOffset(270, 26)
-popup.Position = UDim2.fromOffset(25, 224)
-popup.BackgroundColor3 = Color3.fromRGB(35, 75, 45)
-popup.Text = "Copied to clipboard"
-popup.TextColor3 = Color3.fromRGB(220, 255, 225)
-popup.Font = Enum.Font.GothamBold
-popup.TextSize = 12
-popup.Visible = false
-popup.Parent = frame
-corner(popup, 8)
-
-local divider2 = Instance.new("Frame")
-divider2.Size = UDim2.new(1, -30, 0, 1)
-divider2.Position = UDim2.fromOffset(15, 250)
-divider2.BackgroundColor3 = Color3.fromRGB(70, 180, 95)
-divider2.BorderSizePixel = 0
-divider2.Parent = frame
-
-local credit = Instance.new("TextLabel")
-credit.Size = UDim2.new(1, -20, 0, 22)
-credit.Position = UDim2.fromOffset(10, 254)
-credit.BackgroundTransparency = 1
-credit.Text = "Credit | Chimera__Gaming | FREE AT RSCRIPTS"
-credit.Font = Enum.Font.Gotham
-credit.TextSize = 10
-credit.TextColor3 = Color3.fromRGB(175, 220, 180)
-credit.TextWrapped = true
-credit.Parent = frame
-
---============================================================
--- 09. BUTTON LOGIC
---============================================================
-
-github.MouseButton1Click:Connect(function()
-	setclipboard("https://github.com/ChimeraGaming/LuaScripts")
-	popup.Visible = true
-
-	task.delay(3, function()
-		if popup and popup.Parent then
-			popup.Visible = false
-		end
-	end)
-end)
-
-iy.MouseButton1Click:Connect(function()
-	loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Infinite-Yield-43437"))()
-end)
-
-close.MouseButton1Click:Connect(function()
-	RANGE_ENABLED = false
-	stopRangeEnforcer()
-	resetCollectorSize()
-	gui:Destroy()
-end)
-
---============================================================
--- 10. DRAG LOGIC
---============================================================
-
-local dragging = false
-local dragStart
-local startPos
-
-dragArea.InputBegan:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStart = UIS:GetMouseLocation()
-		startPos = frame.Position
+UIS.InputChanged:Connect(function(input)
+	if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then
+		setRangeFromX(input.Position.X)
 	end
 end)
 
-UIS.InputChanged:Connect(function(i)
-	if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
-		local m = UIS:GetMouseLocation()
-		frame.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + (m.X - dragStart.X),
-			startPos.Y.Scale,
-			startPos.Y.Offset + (m.Y - dragStart.Y)
-		)
-	end
-
-	if sliding and i.UserInputType == Enum.UserInputType.MouseMovement then
-		setRangeFromMouse()
-	end
-end)
-
-UIS.InputEnded:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.MouseButton1 then
-		if dragging then
-			savedPos = frame.Position
-		end
-
-		dragging = false
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		sliding = false
 	end
 end)
 
 --============================================================
--- 11. MINIMIZE BUBBLE
+-- 10. INFINITE YIELD
 --============================================================
 
-local bubble = Instance.new("TextButton")
-bubble.Size = UDim2.fromOffset(52, 52)
-bubble.Position = bubblePos
-bubble.BackgroundColor3 = Color3.fromRGB(15, 35, 22)
-bubble.Text = "G"
-bubble.Font = Enum.Font.GothamBold
-bubble.TextSize = 24
-bubble.TextColor3 = Color3.fromRGB(220, 255, 225)
-bubble.Visible = false
-bubble.Parent = gui
-corner(bubble, 26)
-stroke(bubble, Color3.fromRGB(70, 180, 95), 2)
+local iy = Instance.new("TextButton")
+iy.Size = UDim2.new(1, -80, 0, 38)
+iy.Position = UDim2.fromOffset(40, 170)
+iy.Text = "Load Infinite Yield"
+iy.BackgroundColor3 = Color3.fromRGB(74, 60, 130)
+iy.TextColor3 = Color3.fromRGB(255, 255, 255)
+iy.TextStrokeTransparency = 0.5
+iy.Font = Enum.Font.GothamBold
+iy.TextSize = 14
+iy.BorderSizePixel = 0
+iy.Parent = frame
+
+local iyCorner = Instance.new("UICorner")
+iyCorner.CornerRadius = UDim.new(0, 8)
+iyCorner.Parent = iy
+
+local iyStroke = Instance.new("UIStroke")
+iyStroke.Color = Color3.fromRGB(30, 20, 70)
+iyStroke.Thickness = 2
+iyStroke.Parent = iy
+
+iy.MouseButton1Click:Connect(function()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+end)
+
+--============================================================
+-- 11. NOTE
+--============================================================
+
+local note = Instance.new("TextLabel")
+note.Size = UDim2.new(1, -40, 0, 22)
+note.Position = UDim2.fromOffset(20, 216)
+note.BackgroundTransparency = 1
+note.Text = "Enable AntiAFK for best results"
+note.TextColor3 = Color3.fromRGB(255, 255, 255)
+note.TextStrokeTransparency = 0.25
+note.Font = Enum.Font.GothamBold
+note.TextSize = 12
+note.Parent = frame
+
+--============================================================
+-- 12. CREDIT
+--============================================================
+
+local credit = Instance.new("TextLabel")
+credit.Size = UDim2.new(1, -40, 0, 18)
+credit.Position = UDim2.fromOffset(20, 242)
+credit.BackgroundTransparency = 1
+credit.Text = "Credit | Chimera__Gaming"
+credit.TextColor3 = Color3.fromRGB(230, 255, 230)
+credit.TextStrokeTransparency = 0.4
+credit.Font = Enum.Font.Gotham
+credit.TextSize = 10
+credit.Parent = frame
+
+--============================================================
+-- 13. BOTTOM CONTROLS
+--============================================================
+
+local minimize = Instance.new("TextButton")
+minimize.Size = UDim2.fromOffset(44, 34)
+minimize.Position = UDim2.fromOffset(18, 230)
+minimize.Text = "━"
+minimize.BackgroundTransparency = 1
+minimize.TextColor3 = Color3.fromRGB(0, 170, 255)
+minimize.TextStrokeTransparency = 0
+minimize.Font = Enum.Font.GothamBlack
+minimize.TextSize = 34
+minimize.Parent = frame
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(44, 44)
+close.Position = UDim2.fromOffset(285, 222)
+close.Text = "X"
+close.BackgroundTransparency = 1
+close.TextColor3 = Color3.fromRGB(255, 0, 35)
+close.TextStrokeTransparency = 0
+close.Font = Enum.Font.GothamBlack
+close.TextSize = 34
+close.Parent = frame
+
+close.MouseButton1Click:Connect(function()
+	stop()
+	gui:Destroy()
+end)
+
+--============================================================
+-- 14. DRAGGING
+--============================================================
+
+local function isInside(obj, pos)
+	if not obj or not obj.Visible then return false end
+
+	local ap = obj.AbsolutePosition
+	local as = obj.AbsoluteSize
+
+	return pos.X >= ap.X
+		and pos.X <= ap.X + as.X
+		and pos.Y >= ap.Y
+		and pos.Y <= ap.Y + as.Y
+end
+
+local function isOnNoDragArea(pos)
+	if minimized then return false end
+
+	return isInside(barBack, pos)
+		or isInside(knob, pos)
+		or isInside(toggle, pos)
+		or isInside(iy, pos)
+		or isInside(minimize, pos)
+		or isInside(close, pos)
+end
+
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if isOnNoDragArea(input.Position) then
+			return
+		end
+
+		dragging = true
+		dragMoved = false
+		minimizedDragMoved = false
+		dragStart = input.Position
+		startPos = frame.Position
+	end
+end)
+
+minimize.InputBegan:Connect(function(input)
+	if minimized and input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragMoved = false
+		minimizedDragMoved = false
+		dragStart = input.Position
+		startPos = frame.Position
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+
+		if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
+			dragMoved = true
+			if minimized then
+				minimizedDragMoved = true
+			end
+		end
+
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if dragging then
+			if minimized then
+				savedMinimizedPosition = frame.Position
+			else
+				savedNormalPosition = frame.Position
+			end
+		end
+
+		dragging = false
+	end
+end)
+
+--============================================================
+-- 15. MINIMIZE
+--============================================================
 
 minimize.MouseButton1Click:Connect(function()
-	savedPos = frame.Position
-	bubble.Position = frame.Position
-	frame.Visible = false
-	bubble.Visible = true
+	if minimized and minimizedDragMoved then
+		minimizedDragMoved = false
+		return
+	end
+
+	minimized = not minimized
+
+	if minimized then
+		savedNormalPosition = frame.Position
+
+		frame.Size = UDim2.fromOffset(72, 72)
+		frame.Position = savedMinimizedPosition
+
+		bg.Visible = false
+		label.Visible = false
+		barBack.Visible = false
+		toggle.Visible = false
+		iy.Visible = false
+		note.Visible = false
+		credit.Visible = false
+		close.Visible = false
+
+		minimize.Size = UDim2.fromOffset(70, 70)
+		minimize.Position = UDim2.fromOffset(1, 1)
+		minimize.Text = "🚜"
+		minimize.BackgroundTransparency = 1
+		minimize.TextColor3 = Color3.fromRGB(255, 255, 255)
+		minimize.TextStrokeTransparency = 0
+		minimize.Font = Enum.Font.GothamBlack
+		minimize.TextSize = 38
+	else
+		savedMinimizedPosition = frame.Position
+
+		frame.Size = UDim2.fromOffset(340, 300)
+		frame.Position = savedNormalPosition
+
+		bg.Visible = true
+		label.Visible = true
+		barBack.Visible = true
+		toggle.Visible = true
+		iy.Visible = true
+		note.Visible = true
+		credit.Visible = true
+		close.Visible = true
+
+		minimize.Size = UDim2.fromOffset(44, 34)
+		minimize.Position = UDim2.fromOffset(18, 238)
+		minimize.Text = "━"
+		minimize.TextColor3 = Color3.fromRGB(0, 170, 255)
+		minimize.TextStrokeTransparency = 0
+		minimize.Font = Enum.Font.GothamBlack
+		minimize.TextSize = 34
+
+		close.Position = UDim2.fromOffset(285, 230)
+	end
 end)
-
-bubble.MouseButton1Click:Connect(function()
-	frame.Position = bubble.Position
-	frame.Visible = true
-	bubble.Visible = false
-end)
-
---============================================================
--- 12. LOADED
---============================================================
-
-refreshRangeToggle()
-startRangeEnforcer()
-
-print("Grass Collector Loaded")
