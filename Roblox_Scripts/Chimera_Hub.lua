@@ -39,6 +39,10 @@ local scripts = {
 		File = "GCI.lua"
 	},
 	{
+		Name = "[🔮] Knowledge Incremental",
+		File = "Knowledge_Incremental.lua"
+	},
+	{
 		Name = "Money Incremental 💸",
 		File = "Money_Incremental.lua"
 	},
@@ -71,8 +75,8 @@ gui.Parent = PlayerGui
 --============================================================
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(320, 380)
-frame.Position = UDim2.new(0.5, -160, 0.5, -190)
+frame.Size = UDim2.fromOffset(340, 430)
+frame.Position = UDim2.new(0.5, -170, 0.5, -215)
 frame.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
 frame.BorderSizePixel = 0
 frame.Parent = gui
@@ -124,7 +128,7 @@ end)
 
 local function createButton(text, y, callback)
 	local button = Instance.new("TextButton")
-	button.Size = UDim2.fromOffset(280, 38)
+	button.Size = UDim2.fromOffset(300, 38)
 	button.Position = UDim2.fromOffset(20, y)
 	button.Text = text
 	button.Font = Enum.Font.GothamBold
