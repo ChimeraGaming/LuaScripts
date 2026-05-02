@@ -29,38 +29,43 @@ end
 
 local BASE = "https://raw.githubusercontent.com/ChimeraGaming/LuaScripts/main/Roblox_Scripts/"
 
-local scripts = {
-	{
-		Name = "[✨] Aura Farming Incremental",
-		File = "Aura_Farming_Incremental.lua"
+local tabs = {
+	Games = {
+		{
+			Name = "[✨] Aura Farming Incremental",
+			File = "Aura_Farming_Incremental.lua"
+		},
+		{
+			Name = "🌱 Grass Cutting Incremental 🌱",
+			File = "GCI.lua"
+		},
+		{
+			Name = "[🔮] Knowledge Incremental",
+			File = "Knowledge_Incremental.lua"
+		},
+		{
+			Name = "Money Incremental 💸",
+			File = "Money_Incremental.lua"
+		},
+		{
+			Name = "🌙 [UPD 5] Moon Incremental",
+			File = "Moon_Incremental.lua"
+		},
+		{
+			Name = "[🌎] Space Incremental",
+			File = "Space_Incremental.lua"
+		}
 	},
-	{
-		Name = "🌱 Grass Cutting Incremental 🌱",
-		File = "GCI.lua"
-	},
-	{
-		Name = "[🔮] Knowledge Incremental",
-		File = "Knowledge_Incremental.lua"
-	},
-	{
-		Name = "Money Incremental 💸",
-		File = "Money_Incremental.lua"
-	},
-	{
-		Name = "🌙 [UPD 5] Moon Incremental",
-		File = "Moon_Incremental.lua"
-	},
-	{
-		Name = "[🌎] Space Incremental",
-		File = "Space_Incremental.lua"
-	},
-	{
-		Name = "💾 World Saver",
-		File = "World_Saver.lua"
-	},
-	{
-		Name = "Simple UI for copying player coordinates",
-		File = "Simple_Copy_Cords.lua"
+
+	Tools = {
+		{
+			Name = "💾 World Saver",
+			File = "World_Saver.lua"
+		},
+		{
+			Name = "Simple UI for copying player coordinates",
+			File = "Simple_Copy_Cords.lua"
+		}
 	}
 }
 
@@ -79,8 +84,8 @@ gui.Parent = PlayerGui
 --============================================================
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(340, 475)
-frame.Position = UDim2.new(0.5, -170, 0.5, -237)
+frame.Size = UDim2.fromOffset(340, 430)
+frame.Position = UDim2.new(0.5, -170, 0.5, -215)
 frame.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
 frame.BorderSizePixel = 0
 frame.Parent = gui
@@ -173,18 +178,90 @@ local function loadScript(fileName)
 end
 
 --============================================================
--- 10. SCRIPT BUTTONS
+-- 10. TABS AND SCRIPT BUTTONS
 --============================================================
 
-local y = 55
+local activeTab = "Games"
+local scriptButtons = {}
 
-for _, scriptInfo in ipairs(scripts) do
-	createButton(scriptInfo.Name, y, function()
-		loadScript(scriptInfo.File)
-	end)
+local function resizeFrameForTab(tabName)
+	local count = #tabs[tabName]
+	local height = 130 + (count * 45) + 70
 
-	y += 45
+	frame.Size = UDim2.fromOffset(340, height)
+	frame.Position = UDim2.new(0.5, -170, 0.5, -(height / 2))
 end
+
+local function clearScriptButtons()
+	for _, button in ipairs(scriptButtons) do
+		button:Destroy()
+	end
+
+	table.clear(scriptButtons)
+end
+
+local function updateTabColors(gamesTab, toolsTab)
+	if activeTab == "Games" then
+		gamesTab.BackgroundColor3 = Color3.fromRGB(40, 70, 105)
+		toolsTab.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
+	else
+		gamesTab.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
+		toolsTab.BackgroundColor3 = Color3.fromRGB(40, 70, 105)
+	end
+end
+
+local gamesTab = Instance.new("TextButton")
+gamesTab.Size = UDim2.fromOffset(145, 34)
+gamesTab.Position = UDim2.fromOffset(20, 55)
+gamesTab.Text = "Games"
+gamesTab.Font = Enum.Font.GothamBold
+gamesTab.TextSize = 14
+gamesTab.BackgroundColor3 = Color3.fromRGB(40, 70, 105)
+gamesTab.TextColor3 = Color3.fromRGB(235, 245, 255)
+gamesTab.Parent = frame
+
+Instance.new("UICorner", gamesTab).CornerRadius = UDim.new(0, 10)
+
+local toolsTab = Instance.new("TextButton")
+toolsTab.Size = UDim2.fromOffset(145, 34)
+toolsTab.Position = UDim2.fromOffset(175, 55)
+toolsTab.Text = "Tools"
+toolsTab.Font = Enum.Font.GothamBold
+toolsTab.TextSize = 14
+toolsTab.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
+toolsTab.TextColor3 = Color3.fromRGB(235, 245, 255)
+toolsTab.Parent = frame
+
+Instance.new("UICorner", toolsTab).CornerRadius = UDim.new(0, 10)
+
+local function renderTab(tabName)
+	activeTab = tabName
+	clearScriptButtons()
+	resizeFrameForTab(tabName)
+
+	local y = 105
+
+	for _, scriptInfo in ipairs(tabs[tabName]) do
+		local button = createButton(scriptInfo.Name, y, function()
+			loadScript(scriptInfo.File)
+		end)
+
+		table.insert(scriptButtons, button)
+		y += 45
+	end
+
+	updateTabColors(gamesTab, toolsTab)
+end
+
+gamesTab.MouseButton1Click:Connect(function()
+	renderTab("Games")
+end)
+
+toolsTab.MouseButton1Click:Connect(function()
+	renderTab("Tools")
+end)
+
+renderTab("Games")
 
 --============================================================
 -- 11. CREDIT
