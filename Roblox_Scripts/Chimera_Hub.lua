@@ -31,40 +31,32 @@ local BASE = "https://raw.githubusercontent.com/ChimeraGaming/LuaScripts/main/Ro
 
 local tabs = {
 	Games = {
-		{
-			Name = "[✨] Aura Farming Incremental",
-			File = "Aura_Farming_Incremental.lua"
-		},
-		{
-			Name = "🌱 Grass Cutting Incremental 🌱",
-			File = "GCI.lua"
-		},
-		{
-			Name = "[🔮] Knowledge Incremental",
-			File = "Knowledge_Incremental.lua"
-		},
-		{
-			Name = "Money Incremental 💸",
-			File = "Money_Incremental.lua"
-		},
-		{
-			Name = "🌙 [UPD 5] Moon Incremental",
-			File = "Moon_Incremental.lua"
-		},
-		{
-			Name = "[🌎] Space Incremental",
-			File = "Space_Incremental.lua"
-		}
+		{ Name = "[✨] Aura Farming Incremental", File = "Aura_Farming_Incremental.lua" },
+		{ Name = "🌱 Grass Cutting Incremental 🌱", File = "GCI.lua" },
+		{ Name = "[🔮] Knowledge Incremental", File = "Knowledge_Incremental.lua" },
+		{ Name = "Money Incremental 💸", File = "Money_Incremental.lua" },
+		{ Name = "🌙 [UPD 5] Moon Incremental", File = "Moon_Incremental.lua" },
+		{ Name = "[🌎] Space Incremental", File = "Space_Incremental.lua" }
 	},
 
 	Tools = {
+		{ Name = "💾 World Saver", File = "World_Saver.lua" },
+		{ Name = "Simple UI for copying player coordinates", File = "Simple_Copy_Cords.lua" },
 		{
-			Name = "💾 World Saver",
-			File = "World_Saver.lua"
-		},
+			Name = "Infinite Yield",
+			Custom = function()
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+			end
+		}
+	},
+
+	Credit = {
 		{
-			Name = "Simple UI for copying player coordinates",
-			File = "Simple_Copy_Cords.lua"
+			Name = "Open GitHub Repo",
+			Custom = function()
+				setclipboard("https://github.com/ChimeraGaming/LuaScripts")
+				print("GitHub link copied to clipboard")
+			end
 		}
 	}
 }
@@ -84,8 +76,8 @@ gui.Parent = PlayerGui
 --============================================================
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(340, 430)
-frame.Position = UDim2.new(0.5, -170, 0.5, -215)
+frame.Size = UDim2.fromOffset(360, 430)
+frame.Position = UDim2.new(0.5, -180, 0.5, -215)
 frame.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
 frame.BorderSizePixel = 0
 frame.Parent = gui
@@ -137,7 +129,7 @@ end)
 
 local function createButton(text, y, callback)
 	local button = Instance.new("TextButton")
-	button.Size = UDim2.fromOffset(300, 38)
+	button.Size = UDim2.fromOffset(320, 38)
 	button.Position = UDim2.fromOffset(20, y)
 	button.Text = text
 	button.Font = Enum.Font.GothamBold
@@ -178,7 +170,7 @@ local function loadScript(fileName)
 end
 
 --============================================================
--- 10. TABS AND SCRIPT BUTTONS
+-- 10. TABS SYSTEM
 --============================================================
 
 local activeTab = "Games"
@@ -188,98 +180,97 @@ local function resizeFrameForTab(tabName)
 	local count = #tabs[tabName]
 	local height = 130 + (count * 45) + 70
 
-	frame.Size = UDim2.fromOffset(340, height)
-	frame.Position = UDim2.new(0.5, -170, 0.5, -(height / 2))
+	frame.Size = UDim2.fromOffset(360, height)
+	frame.Position = UDim2.new(0.5, -180, 0.5, -(height / 2))
 end
 
 local function clearScriptButtons()
-	for _, button in ipairs(scriptButtons) do
-		button:Destroy()
+	for _, b in ipairs(scriptButtons) do
+		b:Destroy()
 	end
-
 	table.clear(scriptButtons)
 end
 
-local function updateTabColors(gamesTab, toolsTab)
-	if activeTab == "Games" then
-		gamesTab.BackgroundColor3 = Color3.fromRGB(40, 70, 105)
-		toolsTab.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
-	else
-		gamesTab.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
-		toolsTab.BackgroundColor3 = Color3.fromRGB(40, 70, 105)
-	end
+local function updateTabColors(g, t, c)
+	g.BackgroundColor3 = activeTab == "Games" and Color3.fromRGB(40,70,105) or Color3.fromRGB(30,45,70)
+	t.BackgroundColor3 = activeTab == "Tools" and Color3.fromRGB(40,70,105) or Color3.fromRGB(30,45,70)
+	c.BackgroundColor3 = activeTab == "Credit" and Color3.fromRGB(40,70,105) or Color3.fromRGB(30,45,70)
 end
 
-local gamesTab = Instance.new("TextButton")
-gamesTab.Size = UDim2.fromOffset(145, 34)
-gamesTab.Position = UDim2.fromOffset(20, 55)
-gamesTab.Text = "Games"
-gamesTab.Font = Enum.Font.GothamBold
-gamesTab.TextSize = 14
-gamesTab.BackgroundColor3 = Color3.fromRGB(40, 70, 105)
-gamesTab.TextColor3 = Color3.fromRGB(235, 245, 255)
-gamesTab.Parent = frame
-
-Instance.new("UICorner", gamesTab).CornerRadius = UDim.new(0, 10)
-
-local toolsTab = Instance.new("TextButton")
-toolsTab.Size = UDim2.fromOffset(145, 34)
-toolsTab.Position = UDim2.fromOffset(175, 55)
-toolsTab.Text = "Tools"
-toolsTab.Font = Enum.Font.GothamBold
-toolsTab.TextSize = 14
-toolsTab.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
-toolsTab.TextColor3 = Color3.fromRGB(235, 245, 255)
-toolsTab.Parent = frame
-
-Instance.new("UICorner", toolsTab).CornerRadius = UDim.new(0, 10)
-
-local function renderTab(tabName)
+local function renderTab(tabName, g, t, c)
 	activeTab = tabName
 	clearScriptButtons()
 	resizeFrameForTab(tabName)
 
 	local y = 105
 
-	for _, scriptInfo in ipairs(tabs[tabName]) do
-		local button = createButton(scriptInfo.Name, y, function()
-			loadScript(scriptInfo.File)
-		end)
+	for _, item in ipairs(tabs[tabName]) do
+		local callback
 
-		table.insert(scriptButtons, button)
+		if item.File then
+			callback = function()
+				loadScript(item.File)
+			end
+		else
+			callback = item.Custom
+		end
+
+		local btn = createButton(item.Name, y, callback)
+		table.insert(scriptButtons, btn)
 		y += 45
 	end
 
-	updateTabColors(gamesTab, toolsTab)
+	updateTabColors(g, t, c)
+end
+
+--============================================================
+-- 11. TAB BUTTONS
+--============================================================
+
+local gamesTab = Instance.new("TextButton")
+gamesTab.Size = UDim2.fromOffset(105, 34)
+gamesTab.Position = UDim2.fromOffset(20, 55)
+gamesTab.Text = "Games"
+gamesTab.Parent = frame
+
+local toolsTab = gamesTab:Clone()
+toolsTab.Position = UDim2.fromOffset(130, 55)
+toolsTab.Text = "Tools"
+toolsTab.Parent = frame
+
+local creditTab = gamesTab:Clone()
+creditTab.Position = UDim2.fromOffset(240, 55)
+creditTab.Text = "Credit"
+creditTab.Parent = frame
+
+for _, btn in ipairs({gamesTab, toolsTab, creditTab}) do
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.BackgroundColor3 = Color3.fromRGB(30,45,70)
+	btn.TextColor3 = Color3.fromRGB(235,245,255)
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
 end
 
 gamesTab.MouseButton1Click:Connect(function()
-	renderTab("Games")
+	renderTab("Games", gamesTab, toolsTab, creditTab)
 end)
 
 toolsTab.MouseButton1Click:Connect(function()
-	renderTab("Tools")
+	renderTab("Tools", gamesTab, toolsTab, creditTab)
 end)
 
-renderTab("Games")
+creditTab.MouseButton1Click:Connect(function()
+	renderTab("Credit", gamesTab, toolsTab, creditTab)
+end)
 
 --============================================================
--- 11. CREDIT
+-- INIT
 --============================================================
 
-local credit = Instance.new("TextLabel")
-credit.Size = UDim2.new(1, -24, 0, 40)
-credit.Position = UDim2.new(0, 12, 1, -48)
-credit.BackgroundTransparency = 1
-credit.Text = "Credit | Chimera__Gaming\nFREE AT RSCRIPTS"
-credit.Font = Enum.Font.Gotham
-credit.TextSize = 12
-credit.TextColor3 = Color3.fromRGB(160, 210, 235)
-credit.TextWrapped = true
-credit.Parent = frame
+renderTab("Games", gamesTab, toolsTab, creditTab)
 
 --============================================================
--- 12. DRAGGING
+-- DRAGGING
 --============================================================
 
 local dragging = false
@@ -314,7 +305,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --============================================================
--- 13. LOADED
+-- LOADED
 --============================================================
 
 print("[Chimera Hub] Loaded")
