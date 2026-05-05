@@ -3,8 +3,7 @@
 ![GitHub repo size](https://img.shields.io/github/repo-size/ChimeraGaming/LuaScripts)
 ![GitHub last commit](https://img.shields.io/github/last-commit/ChimeraGaming/LuaScripts)
 ![GitHub issues](https://img.shields.io/github/issues/ChimeraGaming/LuaScripts)
-![GitHub LICENSE](https://img.shields.io/github/license/ChimeraGaming/LuaScripts/LICENSE)
-
+[![GitHub License](https://img.shields.io/github/license/ChimeraGaming/LuaScripts)](./LICENSE)
 ---
 
 ## Overview
