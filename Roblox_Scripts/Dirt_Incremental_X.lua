@@ -1,7 +1,8 @@
 --============================================================
--- Dirt Incremental Collector
--- Touch Radius + Auto ClearDirtServer Fix
+-- Dirt Incremental X
 -- Beta | Credit: ChimeraGaming
+-- Free at Github
+-- https://github.com/ChimeraGaming/LuaScripts
 --============================================================
 
 local Players = game:GetService("Players")
@@ -13,7 +14,9 @@ local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
 local old = PlayerGui:FindFirstChild("DirtIncrementalCollector")
-if old then old:Destroy() end
+if old then
+	old:Destroy()
+end
 
 local Spawning = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Spawning")
 local ClearDirtServer = Spawning:FindFirstChild("ClearDirtServer")
@@ -23,10 +26,13 @@ local connection = nil
 local FIXING = false
 
 local RADIUS = 45
+local OUT_OF_RANGE_LIMIT = 65
+local MAX_DIRT_COUNT = 50
+
 local LOOP_DELAY = 0.06
 local TOUCH_DELAY = 0.012
 local STUCK_FIX_DELAY = 1.25
-local REFILL_WAIT = 0.35
+local REFILL_WAIT = 0.45
 
 local MAX_DIRT_ATTEMPTS = 8
 local dirtAttempts = {}
@@ -35,17 +41,378 @@ local GITHUB_URL = "https://github.com/ChimeraGaming/LuaScripts"
 
 local lastFix = 0
 
-local dragging = false
-local dragStart
-local startPos
-local dragMoved = false
+--============================================================
+-- CODES
+--============================================================
 
-local minimized = false
-local savedNormalPosition = UDim2.fromOffset(120, 120)
-local savedMinimizedPosition = UDim2.fromOffset(120, 120)
+local CODE_LIST = {
+	"wowpotionbox",
+	"secretcode123",
+	"freeexcluck",
+	"tungsahur",
+	"myticketss",
+	"newboxes",
+	"verynicebro",
+	"bigluck67",
+	"moreopeningkeys",
+	"pleasefreepots",
+	"superluck21",
+	"freepots67",
+	"ilovedirt",
+	"smallhouse",
+	"greencactus",
+	"volcanosecret",
+	"backtowork",
+	"potions3",
+	"morerng",
+	"ticketssecret",
+}
 
 --============================================================
--- HELPERS
+-- EGG LOCATIONS
+--============================================================
+
+local EGG_LIST = {
+	{"Egg #1", Vector3.new(-34, 1705, -1633)},
+	{"Egg #2", Vector3.new(-211, 1706, -1599)},
+	{"Egg #3", Vector3.new(-296, 1826, -802)},
+	{"Egg #4", Vector3.new(-58, 1826, -754)},
+	{"Egg #5", Vector3.new(649, 1883, -1237)},
+	{"Egg #6", Vector3.new(512, 1882, -1340)},
+	{"Egg #7", Vector3.new(1420, 1960, -2830)},
+	{"Egg #8", Vector3.new(1179, 1960, -2780)},
+}
+
+--============================================================
+-- PARKOUR LOCATIONS
+--============================================================
+
+local PARKOUR_LIST = {
+	{"Ice Complete", Vector3.new(-1263, 1842, -558)},
+}
+
+--============================================================
+-- GUI
+--============================================================
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "DirtIncrementalCollector"
+gui.ResetOnSpawn = false
+gui.Parent = PlayerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(430, 420)
+frame.Position = UDim2.fromOffset(120, 120)
+frame.BackgroundColor3 = Color3.fromRGB(35, 25, 18)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -70, 0, 30)
+title.Position = UDim2.fromOffset(10, 5)
+title.BackgroundTransparency = 1
+title.Text = "[CRIMSON] 💩 Dirt Incremental X"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(28, 28)
+close.Position = UDim2.fromOffset(390, 5)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(120, 35, 35)
+close.TextColor3 = Color3.fromRGB(255, 255, 255)
+close.Font = Enum.Font.GothamBold
+close.TextSize = 14
+close.BorderSizePixel = 0
+close.Parent = frame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = close
+
+--============================================================
+-- POPUP
+--============================================================
+
+local popup = Instance.new("TextLabel")
+popup.Size = UDim2.fromOffset(220, 30)
+popup.Position = UDim2.fromOffset(105, 10)
+popup.BackgroundColor3 = Color3.fromRGB(50, 140, 55)
+popup.TextColor3 = Color3.fromRGB(255, 255, 255)
+popup.Font = Enum.Font.GothamBold
+popup.TextSize = 12
+popup.Visible = false
+popup.BorderSizePixel = 0
+popup.Parent = frame
+
+local popupCorner = Instance.new("UICorner")
+popupCorner.CornerRadius = UDim.new(0, 8)
+popupCorner.Parent = popup
+
+local popupToken = 0
+
+local function showPopup(text)
+	popupToken += 1
+	local token = popupToken
+
+	popup.Text = text
+	popup.Visible = true
+
+	task.delay(1, function()
+		if popupToken == token then
+			popup.Visible = false
+		end
+	end)
+end
+
+--============================================================
+-- TELEPORT FUNCTION
+--============================================================
+
+local function teleportTo(position, label)
+	local char = Player.Character or Player.CharacterAdded:Wait()
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+
+	if not hrp then
+		showPopup("No HumanoidRootPart")
+		return
+	end
+
+	hrp.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+	showPopup("Teleported " .. label)
+end
+
+--============================================================
+-- TABS
+--============================================================
+
+local tabHolder = Instance.new("Frame")
+tabHolder.Size = UDim2.new(1, -20, 0, 35)
+tabHolder.Position = UDim2.fromOffset(10, 40)
+tabHolder.BackgroundTransparency = 1
+tabHolder.Parent = frame
+
+local contentHolder = Instance.new("Frame")
+contentHolder.Size = UDim2.new(1, -20, 1, -90)
+contentHolder.Position = UDim2.fromOffset(10, 80)
+contentHolder.BackgroundTransparency = 1
+contentHolder.Parent = frame
+
+local pages = {}
+local buttons = {}
+
+local function setActivePage(name)
+	for pageName, page in pairs(pages) do
+		page.Visible = pageName == name
+	end
+
+	for buttonName, button in pairs(buttons) do
+		if buttonName == name then
+			button.BackgroundColor3 = Color3.fromRGB(110, 75, 45)
+		else
+			button.BackgroundColor3 = Color3.fromRGB(70, 55, 40)
+		end
+	end
+end
+
+local function createPage(name, order)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.fromOffset(95, 30)
+	button.Position = UDim2.fromOffset((order - 1) * 100, 0)
+	button.Text = name
+	button.BackgroundColor3 = Color3.fromRGB(70, 55, 40)
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 12
+	button.BorderSizePixel = 0
+	button.Parent = tabHolder
+
+	local bc = Instance.new("UICorner")
+	bc.CornerRadius = UDim.new(0, 6)
+	bc.Parent = button
+
+	local page = Instance.new("ScrollingFrame")
+	page.Size = UDim2.new(1, 0, 1, 0)
+	page.CanvasSize = UDim2.new(0, 0, 0, 0)
+	page.ScrollBarThickness = 4
+	page.BackgroundTransparency = 1
+	page.BorderSizePixel = 0
+	page.Visible = false
+	page.Parent = contentHolder
+
+	pages[name] = page
+	buttons[name] = button
+
+	button.MouseButton1Click:Connect(function()
+		setActivePage(name)
+	end)
+
+	return page
+end
+
+local mainPage = createPage("Main", 1)
+local eggPage = createPage("Egg Hunt", 2)
+local codePage = createPage("Codes", 3)
+local parkourPage = createPage("Parkour", 4)
+
+setActivePage("Main")
+
+--============================================================
+-- MAIN PAGE
+--============================================================
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(1, -20, 0, 42)
+toggle.Position = UDim2.fromOffset(10, 10)
+toggle.Text = "OFF"
+toggle.BackgroundColor3 = Color3.fromRGB(95, 55, 35)
+toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggle.Font = Enum.Font.GothamBlack
+toggle.TextSize = 18
+toggle.BorderSizePixel = 0
+toggle.Parent = mainPage
+
+local tc = Instance.new("UICorner")
+tc.CornerRadius = UDim.new(0, 8)
+tc.Parent = toggle
+
+local note = Instance.new("TextLabel")
+note.Size = UDim2.new(1, -20, 0, 150)
+note.Position = UDim2.fromOffset(10, 60)
+note.BackgroundTransparency = 1
+note.TextWrapped = true
+note.TextYAlignment = Enum.TextYAlignment.Top
+note.Text = "Beta script. Bugs will be present and future updates will continue.\n\nFailsafe added: if dirt count exceeds 50 it fully local clears then calls server clear. If player moves too far away from dirt range, collector turns OFF.\n\nCredit: ChimeraGaming\nFree at Github."
+note.TextColor3 = Color3.fromRGB(255, 255, 255)
+note.Font = Enum.Font.Gotham
+note.TextSize = 13
+note.Parent = mainPage
+
+local githubButton = Instance.new("TextButton")
+githubButton.Size = UDim2.new(1, -20, 0, 35)
+githubButton.Position = UDim2.fromOffset(10, 225)
+githubButton.Text = "COPY GITHUB LINK"
+githubButton.BackgroundColor3 = Color3.fromRGB(70, 55, 40)
+githubButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+githubButton.Font = Enum.Font.GothamBold
+githubButton.TextSize = 13
+githubButton.BorderSizePixel = 0
+githubButton.Parent = mainPage
+
+local githubCorner = Instance.new("UICorner")
+githubCorner.CornerRadius = UDim.new(0, 8)
+githubCorner.Parent = githubButton
+
+githubButton.MouseButton1Click:Connect(function()
+	if setclipboard then
+		setclipboard(GITHUB_URL)
+		showPopup("Copied GitHub Link")
+	else
+		showPopup("Clipboard Unsupported")
+	end
+end)
+
+--============================================================
+-- EGG HUNT PAGE
+--============================================================
+
+for i, data in ipairs(EGG_LIST) do
+	local name = data[1]
+	local position = data[2]
+
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -10, 0, 34)
+	btn.Position = UDim2.fromOffset(5, (i - 1) * 38)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 45, 35)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 12
+	btn.Text = name .. " | Teleport"
+	btn.BorderSizePixel = 0
+	btn.Parent = eggPage
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 6)
+	c.Parent = btn
+
+	btn.MouseButton1Click:Connect(function()
+		teleportTo(position, name)
+	end)
+end
+
+eggPage.CanvasSize = UDim2.fromOffset(0, #EGG_LIST * 40)
+
+--============================================================
+-- CODE PAGE
+--============================================================
+
+for i, code in ipairs(CODE_LIST) do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -10, 0, 30)
+	btn.Position = UDim2.fromOffset(5, (i - 1) * 34)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 45, 35)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 12
+	btn.Text = code
+	btn.BorderSizePixel = 0
+	btn.Parent = codePage
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 6)
+	c.Parent = btn
+
+	btn.MouseButton1Click:Connect(function()
+		if setclipboard then
+			setclipboard(code)
+			showPopup("Copied Code")
+		else
+			showPopup("Clipboard Unsupported")
+		end
+	end)
+end
+
+codePage.CanvasSize = UDim2.fromOffset(0, #CODE_LIST * 35)
+
+--============================================================
+-- PARKOUR PAGE
+--============================================================
+
+for i, data in ipairs(PARKOUR_LIST) do
+	local name = data[1]
+	local position = data[2]
+
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -10, 0, 35)
+	btn.Position = UDim2.fromOffset(5, (i - 1) * 39)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 45, 35)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 13
+	btn.Text = name .. " | Teleport"
+	btn.BorderSizePixel = 0
+	btn.Parent = parkourPage
+
+	local pcc = Instance.new("UICorner")
+	pcc.CornerRadius = UDim.new(0, 6)
+	pcc.Parent = btn
+
+	btn.MouseButton1Click:Connect(function()
+		teleportTo(position, name)
+	end)
+end
+
+parkourPage.CanvasSize = UDim2.fromOffset(0, #PARKOUR_LIST * 40)
+
+--============================================================
+-- COLLECTOR HELPERS
 --============================================================
 
 local function getRoot()
@@ -95,9 +462,56 @@ local function cleanupAttempts()
 	end
 end
 
+local function getDirtCount()
+	local root = getRoot()
+	if not root then
+		return 0
+	end
+
+	return #root:GetChildren()
+end
+
+local function localClearAllDirts()
+	local root = getRoot()
+	if not root then
+		return 0
+	end
+
+	local removed = 0
+
+	for _, dirt in ipairs(root:GetChildren()) do
+		if dirt then
+			pcall(function()
+				dirt:Destroy()
+				removed += 1
+			end)
+		end
+	end
+
+	table.clear(dirtAttempts)
+
+	return removed
+end
+
+local function forceClear()
+	localClearAllDirts()
+
+	task.wait(0.05)
+
+	pcall(function()
+		if ClearDirtServer then
+			ClearDirtServer:FireServer()
+		end
+	end)
+
+	task.wait(REFILL_WAIT)
+end
+
 local function removeNoTouchDirt()
 	local root = getRoot()
-	if not root then return 0 end
+	if not root then
+		return 0
+	end
 
 	local removed = 0
 
@@ -111,14 +525,63 @@ local function removeNoTouchDirt()
 	return removed
 end
 
-local function forceClear()
-	pcall(function()
-		if ClearDirtServer then
-			ClearDirtServer:FireServer()
-		end
-	end)
+local function getClosestDirtDistance()
+	local root = getRoot()
+	local hrp = getHRP()
 
-	task.wait(REFILL_WAIT)
+	if not root or not hrp then
+		return nil
+	end
+
+	local closest = nil
+
+	for _, dirt in ipairs(root:GetChildren()) do
+		if dirt and dirt.Parent then
+			local touchParts = getTouchParts(dirt)
+
+			for _, part in ipairs(touchParts) do
+				if part and part.Parent and part:IsA("BasePart") then
+					local distance = (hrp.Position - part.Position).Magnitude
+
+					if not closest or distance < closest then
+						closest = distance
+					end
+				end
+			end
+		end
+	end
+
+	return closest
+end
+
+local function turnOffCollector(reason)
+	ENABLED = false
+	FIXING = false
+	connection = nil
+
+	toggle.Text = "OFF"
+	toggle.BackgroundColor3 = Color3.fromRGB(95, 55, 35)
+
+	showPopup(reason or "Collector OFF")
+end
+
+local function checkFailsafes()
+	local dirtCount = getDirtCount()
+
+	if dirtCount > MAX_DIRT_COUNT then
+		forceClear()
+		showPopup("Full Cleared Dirt Overflow")
+		return false
+	end
+
+	local closestDistance = getClosestDirtDistance()
+
+	if closestDistance and closestDistance > OUT_OF_RANGE_LIMIT then
+		turnOffCollector("Out Of Range OFF")
+		return true
+	end
+
+	return false
 end
 
 local function touchRadius()
@@ -148,7 +611,6 @@ local function touchRadius()
 
 						if dirtAttempts[dirt] >= MAX_DIRT_ATTEMPTS then
 							dirtAttempts[dirt] = nil
-
 							forceClear()
 							return touched
 						end
@@ -215,6 +677,12 @@ local function startCollector()
 		while ENABLED do
 			local ok, err = pcall(function()
 				if not FIXING then
+					local stoppedByFailsafe = checkFailsafes()
+
+					if stoppedByFailsafe then
+						return
+					end
+
 					local touched = touchRadius()
 
 					if touched == 0 then
@@ -241,136 +709,6 @@ local function stopCollector()
 	FIXING = false
 end
 
---============================================================
--- GUI
---============================================================
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "DirtIncrementalCollector"
-gui.ResetOnSpawn = false
-gui.Parent = PlayerGui
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(260, 250)
-frame.Position = savedNormalPosition
-frame.BackgroundColor3 = Color3.fromRGB(35, 25, 18)
-frame.BorderSizePixel = 0
-frame.Parent = gui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = frame
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -70, 0, 32)
-title.Position = UDim2.fromOffset(10, 4)
-title.BackgroundTransparency = 1
-title.Text = "Dirt Radius Collector"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 15
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = frame
-
-local minimize = Instance.new("TextButton")
-minimize.Size = UDim2.fromOffset(28, 28)
-minimize.Position = UDim2.fromOffset(195, 6)
-minimize.Text = "_"
-minimize.BackgroundColor3 = Color3.fromRGB(70, 55, 40)
-minimize.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimize.Font = Enum.Font.GothamBold
-minimize.TextSize = 16
-minimize.BorderSizePixel = 0
-minimize.Parent = frame
-
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 6)
-minCorner.Parent = minimize
-
-local close = Instance.new("TextButton")
-close.Size = UDim2.fromOffset(28, 28)
-close.Position = UDim2.fromOffset(227, 6)
-close.Text = "X"
-close.BackgroundColor3 = Color3.fromRGB(120, 35, 35)
-close.TextColor3 = Color3.fromRGB(255, 255, 255)
-close.Font = Enum.Font.GothamBold
-close.TextSize = 14
-close.BorderSizePixel = 0
-close.Parent = frame
-
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 6)
-closeCorner.Parent = close
-
-local toggle = Instance.new("TextButton")
-toggle.Size = UDim2.new(1, -30, 0, 42)
-toggle.Position = UDim2.fromOffset(15, 55)
-toggle.Text = "OFF"
-toggle.BackgroundColor3 = Color3.fromRGB(95, 55, 35)
-toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggle.Font = Enum.Font.GothamBlack
-toggle.TextSize = 18
-toggle.BorderSizePixel = 0
-toggle.Parent = frame
-
-local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(0, 8)
-toggleCorner.Parent = toggle
-
-local note = Instance.new("TextLabel")
-note.Size = UDim2.new(1, -30, 0, 76)
-note.Position = UDim2.fromOffset(15, 108)
-note.BackgroundTransparency = 1
-note.TextWrapped = true
-note.TextYAlignment = Enum.TextYAlignment.Top
-note.Text = "Beta script. Bugs will be present. This will be updated in the future. Best method is still to manually collect.\n\nCredit: ChimeraGaming"
-note.TextColor3 = Color3.fromRGB(235, 235, 235)
-note.Font = Enum.Font.Gotham
-note.TextSize = 11
-note.Parent = frame
-
-local githubButton = Instance.new("TextButton")
-githubButton.Size = UDim2.new(1, -30, 0, 34)
-githubButton.Position = UDim2.fromOffset(15, 185)
-githubButton.Text = "FREE AT GITHUB"
-githubButton.BackgroundColor3 = Color3.fromRGB(70, 55, 40)
-githubButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-githubButton.Font = Enum.Font.GothamBlack
-githubButton.TextSize = 13
-githubButton.BorderSizePixel = 0
-githubButton.Parent = frame
-
-local githubCorner = Instance.new("UICorner")
-githubCorner.CornerRadius = UDim.new(0, 8)
-githubCorner.Parent = githubButton
-
-local linkNote = Instance.new("TextLabel")
-linkNote.Size = UDim2.new(1, -30, 0, 18)
-linkNote.Position = UDim2.fromOffset(15, 223)
-linkNote.BackgroundTransparency = 1
-linkNote.Text = GITHUB_URL
-linkNote.TextColor3 = Color3.fromRGB(190, 190, 190)
-linkNote.Font = Enum.Font.Gotham
-linkNote.TextSize = 9
-linkNote.TextWrapped = true
-linkNote.Parent = frame
-
-local popup = Instance.new("TextLabel")
-popup.Size = UDim2.fromOffset(170, 28)
-popup.Position = UDim2.fromOffset(45, 150)
-popup.BackgroundColor3 = Color3.fromRGB(50, 140, 55)
-popup.TextColor3 = Color3.fromRGB(255, 255, 255)
-popup.Text = "Copied GitHub link"
-popup.Font = Enum.Font.GothamBold
-popup.TextSize = 12
-popup.Visible = false
-popup.BorderSizePixel = 0
-popup.Parent = frame
-
-local popupCorner = Instance.new("UICorner")
-popupCorner.CornerRadius = UDim.new(0, 8)
-popupCorner.Parent = popup
-
 toggle.MouseButton1Click:Connect(function()
 	ENABLED = not ENABLED
 
@@ -385,24 +723,6 @@ toggle.MouseButton1Click:Connect(function()
 	end
 end)
 
-githubButton.MouseButton1Click:Connect(function()
-	if setclipboard then
-		setclipboard(GITHUB_URL)
-
-		popup.Text = "Copied GitHub link"
-		popup.BackgroundColor3 = Color3.fromRGB(50, 140, 55)
-	else
-		popup.Text = "Clipboard not supported"
-		popup.BackgroundColor3 = Color3.fromRGB(140, 45, 45)
-	end
-
-	popup.Visible = true
-
-	task.wait(2)
-
-	popup.Visible = false
-end)
-
 close.MouseButton1Click:Connect(function()
 	stopCollector()
 	gui:Destroy()
@@ -411,6 +731,10 @@ end)
 --============================================================
 -- DRAGGING
 --============================================================
+
+local dragging = false
+local dragStart
+local startPos
 
 local function isInside(obj, pos)
 	if not obj or not obj.Visible then
@@ -427,14 +751,17 @@ local function isInside(obj, pos)
 end
 
 local function isNoDrag(pos)
-	if minimized then
-		return false
+	if isInside(close, pos) then
+		return true
 	end
 
-	return isInside(toggle, pos)
-		or isInside(githubButton, pos)
-		or isInside(minimize, pos)
-		or isInside(close, pos)
+	for _, button in pairs(buttons) do
+		if isInside(button, pos) then
+			return true
+		end
+	end
+
+	return false
 end
 
 frame.InputBegan:Connect(function(input)
@@ -444,7 +771,6 @@ frame.InputBegan:Connect(function(input)
 		end
 
 		dragging = true
-		dragMoved = false
 		dragStart = input.Position
 		startPos = frame.Position
 	end
@@ -453,10 +779,6 @@ end)
 UIS.InputChanged:Connect(function(input)
 	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 		local delta = input.Position - dragStart
-
-		if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
-			dragMoved = true
-		end
 
 		frame.Position = UDim2.new(
 			startPos.X.Scale,
@@ -469,64 +791,6 @@ end)
 
 UIS.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		if dragging then
-			if minimized then
-				savedMinimizedPosition = frame.Position
-			else
-				savedNormalPosition = frame.Position
-			end
-		end
-
 		dragging = false
-	end
-end)
-
---============================================================
--- MINIMIZE
---============================================================
-
-minimize.MouseButton1Click:Connect(function()
-	if dragMoved then
-		dragMoved = false
-		return
-	end
-
-	minimized = not minimized
-
-	if minimized then
-		savedNormalPosition = frame.Position
-
-		frame.Size = UDim2.fromOffset(58, 58)
-		frame.Position = savedMinimizedPosition
-
-		title.Visible = false
-		toggle.Visible = false
-		note.Visible = false
-		githubButton.Visible = false
-		linkNote.Visible = false
-		popup.Visible = false
-		close.Visible = false
-
-		minimize.Size = UDim2.fromOffset(58, 58)
-		minimize.Position = UDim2.fromOffset(0, 0)
-		minimize.Text = "D"
-		minimize.TextSize = 24
-	else
-		savedMinimizedPosition = frame.Position
-
-		frame.Size = UDim2.fromOffset(260, 250)
-		frame.Position = savedNormalPosition
-
-		title.Visible = true
-		toggle.Visible = true
-		note.Visible = true
-		githubButton.Visible = true
-		linkNote.Visible = true
-		close.Visible = true
-
-		minimize.Size = UDim2.fromOffset(28, 28)
-		minimize.Position = UDim2.fromOffset(195, 6)
-		minimize.Text = "_"
-		minimize.TextSize = 16
 	end
 end)
