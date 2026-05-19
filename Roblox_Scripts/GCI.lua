@@ -38,7 +38,6 @@ local original = {}
 local dragging = false
 local dragStart
 local startPos
-local dragMoved = false
 local minimizedDragMoved = false
 
 local minimized = false
@@ -116,7 +115,7 @@ gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(340, 300)
+frame.Size = UDim2.fromOffset(340, 340)
 frame.Position = savedNormalPosition
 frame.BackgroundTransparency = 1
 frame.Parent = gui
@@ -236,11 +235,16 @@ local function setRangeFromX(x)
 	)
 
 	RANGE_LEVEL = math.floor(percent * RANGE_MAX)
+
 	if RANGE_LEVEL < RANGE_MIN then
 		RANGE_LEVEL = RANGE_MIN
 	end
 
-	local fillWidth = math.clamp(percent * barBack.AbsoluteSize.X, 8, barBack.AbsoluteSize.X)
+	local fillWidth = math.clamp(
+		percent * barBack.AbsoluteSize.X,
+		8,
+		barBack.AbsoluteSize.X
+	)
 
 	fill.Size = UDim2.fromOffset(fillWidth, 18)
 	knob.Position = UDim2.fromOffset(fillWidth - 9, -5)
@@ -274,12 +278,41 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --============================================================
--- 10. INFINITE YIELD
+-- 10. GRASSLAND FIGHTING BUTTON
+--============================================================
+
+local grassland = Instance.new("TextButton")
+grassland.Size = UDim2.new(1, -80, 0, 38)
+grassland.Position = UDim2.fromOffset(40, 154)
+grassland.Text = "🌱Grassland Fighting🌱"
+grassland.BackgroundColor3 = Color3.fromRGB(74, 60, 130)
+grassland.TextColor3 = Color3.fromRGB(255, 255, 255)
+grassland.TextStrokeTransparency = 0.5
+grassland.Font = Enum.Font.GothamBold
+grassland.TextSize = 14
+grassland.BorderSizePixel = 0
+grassland.Parent = frame
+
+local grasslandCorner = Instance.new("UICorner")
+grasslandCorner.CornerRadius = UDim.new(0, 8)
+grasslandCorner.Parent = grassland
+
+local grasslandStroke = Instance.new("UIStroke")
+grasslandStroke.Color = Color3.fromRGB(30, 20, 70)
+grasslandStroke.Thickness = 2
+grasslandStroke.Parent = grassland
+
+grassland.MouseButton1Click:Connect(function()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/ChimeraGaming/LuaScripts/main/Roblox_Scripts/GCI_Grasslands.lua"))()
+end)
+
+--============================================================
+-- 11. INFINITE YIELD BUTTON
 --============================================================
 
 local iy = Instance.new("TextButton")
 iy.Size = UDim2.new(1, -80, 0, 38)
-iy.Position = UDim2.fromOffset(40, 170)
+iy.Position = UDim2.fromOffset(40, 198)
 iy.Text = "Load Infinite Yield"
 iy.BackgroundColor3 = Color3.fromRGB(74, 60, 130)
 iy.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -303,12 +336,12 @@ iy.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
--- 11. NOTE
+-- 12. NOTE
 --============================================================
 
 local note = Instance.new("TextLabel")
 note.Size = UDim2.new(1, -40, 0, 22)
-note.Position = UDim2.fromOffset(20, 216)
+note.Position = UDim2.fromOffset(20, 244)
 note.BackgroundTransparency = 1
 note.Text = "Enable AntiAFK for best results"
 note.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -318,12 +351,12 @@ note.TextSize = 12
 note.Parent = frame
 
 --============================================================
--- 12. CREDIT
+-- 13. CREDIT
 --============================================================
 
 local credit = Instance.new("TextLabel")
 credit.Size = UDim2.new(1, -40, 0, 18)
-credit.Position = UDim2.fromOffset(20, 242)
+credit.Position = UDim2.fromOffset(20, 268)
 credit.BackgroundTransparency = 1
 credit.Text = "Credit | Chimera__Gaming"
 credit.TextColor3 = Color3.fromRGB(230, 255, 230)
@@ -333,12 +366,12 @@ credit.TextSize = 10
 credit.Parent = frame
 
 --============================================================
--- 13. BOTTOM CONTROLS
+-- 14. BOTTOM CONTROLS
 --============================================================
 
 local minimize = Instance.new("TextButton")
 minimize.Size = UDim2.fromOffset(44, 34)
-minimize.Position = UDim2.fromOffset(18, 230)
+minimize.Position = UDim2.fromOffset(18, 286)
 minimize.Text = "━"
 minimize.BackgroundTransparency = 1
 minimize.TextColor3 = Color3.fromRGB(0, 170, 255)
@@ -349,7 +382,7 @@ minimize.Parent = frame
 
 local close = Instance.new("TextButton")
 close.Size = UDim2.fromOffset(44, 44)
-close.Position = UDim2.fromOffset(285, 222)
+close.Position = UDim2.fromOffset(285, 278)
 close.Text = "X"
 close.BackgroundTransparency = 1
 close.TextColor3 = Color3.fromRGB(255, 0, 35)
@@ -364,7 +397,7 @@ close.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
--- 14. DRAGGING
+-- 15. DRAGGING
 --============================================================
 
 local function isInside(obj, pos)
@@ -385,6 +418,7 @@ local function isOnNoDragArea(pos)
 	return isInside(barBack, pos)
 		or isInside(knob, pos)
 		or isInside(toggle, pos)
+		or isInside(grassland, pos)
 		or isInside(iy, pos)
 		or isInside(minimize, pos)
 		or isInside(close, pos)
@@ -397,7 +431,6 @@ frame.InputBegan:Connect(function(input)
 		end
 
 		dragging = true
-		dragMoved = false
 		minimizedDragMoved = false
 		dragStart = input.Position
 		startPos = frame.Position
@@ -407,7 +440,6 @@ end)
 minimize.InputBegan:Connect(function(input)
 	if minimized and input.UserInputType == Enum.UserInputType.MouseButton1 then
 		dragging = true
-		dragMoved = false
 		minimizedDragMoved = false
 		dragStart = input.Position
 		startPos = frame.Position
@@ -418,11 +450,8 @@ UIS.InputChanged:Connect(function(input)
 	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 		local delta = input.Position - dragStart
 
-		if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
-			dragMoved = true
-			if minimized then
-				minimizedDragMoved = true
-			end
+		if minimized and (math.abs(delta.X) > 4 or math.abs(delta.Y) > 4) then
+			minimizedDragMoved = true
 		end
 
 		frame.Position = UDim2.new(
@@ -449,7 +478,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --============================================================
--- 15. MINIMIZE
+-- 16. MINIMIZE
 --============================================================
 
 minimize.MouseButton1Click:Connect(function()
@@ -470,6 +499,7 @@ minimize.MouseButton1Click:Connect(function()
 		label.Visible = false
 		barBack.Visible = false
 		toggle.Visible = false
+		grassland.Visible = false
 		iy.Visible = false
 		note.Visible = false
 		credit.Visible = false
@@ -486,26 +516,27 @@ minimize.MouseButton1Click:Connect(function()
 	else
 		savedMinimizedPosition = frame.Position
 
-		frame.Size = UDim2.fromOffset(340, 300)
+		frame.Size = UDim2.fromOffset(340, 340)
 		frame.Position = savedNormalPosition
 
 		bg.Visible = true
 		label.Visible = true
 		barBack.Visible = true
 		toggle.Visible = true
+		grassland.Visible = true
 		iy.Visible = true
 		note.Visible = true
 		credit.Visible = true
 		close.Visible = true
 
 		minimize.Size = UDim2.fromOffset(44, 34)
-		minimize.Position = UDim2.fromOffset(18, 238)
+		minimize.Position = UDim2.fromOffset(18, 286)
 		minimize.Text = "━"
 		minimize.TextColor3 = Color3.fromRGB(0, 170, 255)
 		minimize.TextStrokeTransparency = 0
 		minimize.Font = Enum.Font.GothamBlack
 		minimize.TextSize = 34
 
-		close.Position = UDim2.fromOffset(285, 230)
+		close.Position = UDim2.fromOffset(285, 278)
 	end
 end)
