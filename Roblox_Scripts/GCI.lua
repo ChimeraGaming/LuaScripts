@@ -371,7 +371,7 @@ credit.Parent = frame
 
 local minimize = Instance.new("TextButton")
 minimize.Size = UDim2.fromOffset(44, 34)
-minimize.Position = UDim2.fromOffset(18, 286)
+minimize.Position = UDim2.fromOffset(18, 266)
 minimize.Text = "━"
 minimize.BackgroundTransparency = 1
 minimize.TextColor3 = Color3.fromRGB(0, 170, 255)
@@ -382,7 +382,7 @@ minimize.Parent = frame
 
 local close = Instance.new("TextButton")
 close.Size = UDim2.fromOffset(44, 44)
-close.Position = UDim2.fromOffset(285, 278)
+close.Position = UDim2.fromOffset(285, 258)
 close.Text = "X"
 close.BackgroundTransparency = 1
 close.TextColor3 = Color3.fromRGB(255, 0, 35)
