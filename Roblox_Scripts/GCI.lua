@@ -2,10 +2,6 @@
 -- Grass Collector UI
 --============================================================
 
---============================================================
--- 01. SERVICES
---============================================================
-
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -17,20 +13,12 @@ local PlayerGui = Player:WaitForChild("PlayerGui")
 local old = PlayerGui:FindFirstChild("GrassCollector")
 if old then old:Destroy() end
 
---============================================================
--- 02. SETTINGS
---============================================================
-
 local RANGE_LEVEL = 1
 local RANGE_MIN = 1
 local RANGE_MAX = 100
 local RANGE_ENABLED = false
 
 local BG = "https://www.roblox.com/asset-thumbnail/image?assetId=100488071891852&width=420&height=420&format=png"
-
---============================================================
--- 03. STATE
---============================================================
 
 local connection
 local original = {}
@@ -43,10 +31,6 @@ local minimizedDragMoved = false
 local minimized = false
 local savedNormalPosition = UDim2.fromOffset(120, 120)
 local savedMinimizedPosition = UDim2.fromOffset(120, 120)
-
---============================================================
--- 04. COLLECTOR LOGIC
---============================================================
 
 local function getFolder()
 	return Workspace:FindFirstChild("GrassCollider")
@@ -105,9 +89,14 @@ local function stop()
 	end
 end
 
---============================================================
--- 05. ROOT GUI
---============================================================
+local function teleportToCoolWorld()
+	local character = Player.Character or Player.CharacterAdded:Wait()
+	local root = character:FindFirstChild("HumanoidRootPart")
+
+	if root then
+		root.CFrame = CFrame.new(-170, -37, 390)
+	end
+end
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "GrassCollector"
@@ -127,10 +116,6 @@ bg.Image = BG
 bg.ScaleType = Enum.ScaleType.Stretch
 bg.Parent = frame
 
---============================================================
--- 06. RANGE LABEL
---============================================================
-
 local label = Instance.new("TextLabel")
 label.Size = UDim2.new(1, -40, 0, 24)
 label.Position = UDim2.fromOffset(20, 76)
@@ -141,10 +126,6 @@ label.TextStrokeTransparency = 0.25
 label.Font = Enum.Font.GothamBold
 label.TextSize = 14
 label.Parent = frame
-
---============================================================
--- 07. RANGE BAR
---============================================================
 
 local barBack = Instance.new("Frame")
 barBack.Size = UDim2.fromOffset(225, 18)
@@ -183,10 +164,6 @@ knobStroke.Color = Color3.fromRGB(25, 80, 30)
 knobStroke.Thickness = 2
 knobStroke.Parent = knob
 
---============================================================
--- 08. RANGE TOGGLE
---============================================================
-
 local toggle = Instance.new("TextButton")
 toggle.Size = UDim2.fromOffset(34, 34)
 toggle.Position = UDim2.fromOffset(270, 104)
@@ -220,10 +197,6 @@ toggle.MouseButton1Click:Connect(function()
 		stop()
 	end
 end)
-
---============================================================
--- 09. SLIDER LOGIC
---============================================================
 
 local sliding = false
 
@@ -277,71 +250,55 @@ UIS.InputEnded:Connect(function(input)
 	end
 end)
 
---============================================================
--- 10. GRASSLAND FIGHTING BUTTON
---============================================================
+local function makeButton(text, x, y)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.fromOffset(118, 38)
+	btn.Position = UDim2.fromOffset(x, y)
+	btn.Text = text
+	btn.BackgroundColor3 = Color3.fromRGB(74, 60, 130)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.TextStrokeTransparency = 0.5
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.BorderSizePixel = 0
+	btn.Parent = frame
 
-local grassland = Instance.new("TextButton")
-grassland.Size = UDim2.new(1, -80, 0, 38)
-grassland.Position = UDim2.fromOffset(40, 154)
-grassland.Text = "🌱Grassland Fighting🌱"
-grassland.BackgroundColor3 = Color3.fromRGB(74, 60, 130)
-grassland.TextColor3 = Color3.fromRGB(255, 255, 255)
-grassland.TextStrokeTransparency = 0.5
-grassland.Font = Enum.Font.GothamBold
-grassland.TextSize = 14
-grassland.BorderSizePixel = 0
-grassland.Parent = frame
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = btn
 
-local grasslandCorner = Instance.new("UICorner")
-grasslandCorner.CornerRadius = UDim.new(0, 8)
-grasslandCorner.Parent = grassland
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(30, 20, 70)
+	stroke.Thickness = 2
+	stroke.Parent = btn
 
-local grasslandStroke = Instance.new("UIStroke")
-grasslandStroke.Color = Color3.fromRGB(30, 20, 70)
-grasslandStroke.Thickness = 2
-grasslandStroke.Parent = grassland
+	return btn
+end
+
+local infYield = makeButton("Inf Yield", 42, 152)
+local grassland = makeButton("Grassland", 178, 152)
+local solarian = makeButton("Solarian", 42, 196)
+local planetRun = makeButton("Planet Run", 178, 196)
+
+infYield.MouseButton1Click:Connect(function()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+end)
 
 grassland.MouseButton1Click:Connect(function()
 	loadstring(game:HttpGet("https://raw.githubusercontent.com/ChimeraGaming/LuaScripts/main/Roblox_Scripts/GCI_Grasslands.lua"))()
 end)
 
---============================================================
--- 11. INFINITE YIELD BUTTON
---============================================================
-
-local iy = Instance.new("TextButton")
-iy.Size = UDim2.new(1, -80, 0, 38)
-iy.Position = UDim2.fromOffset(40, 198)
-iy.Text = "Load Infinite Yield"
-iy.BackgroundColor3 = Color3.fromRGB(74, 60, 130)
-iy.TextColor3 = Color3.fromRGB(255, 255, 255)
-iy.TextStrokeTransparency = 0.5
-iy.Font = Enum.Font.GothamBold
-iy.TextSize = 14
-iy.BorderSizePixel = 0
-iy.Parent = frame
-
-local iyCorner = Instance.new("UICorner")
-iyCorner.CornerRadius = UDim.new(0, 8)
-iyCorner.Parent = iy
-
-local iyStroke = Instance.new("UIStroke")
-iyStroke.Color = Color3.fromRGB(30, 20, 70)
-iyStroke.Thickness = 2
-iyStroke.Parent = iy
-
-iy.MouseButton1Click:Connect(function()
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+solarian.MouseButton1Click:Connect(function()
+	print("Solarian not linked yet")
 end)
 
---============================================================
--- 12. NOTE
---============================================================
+planetRun.MouseButton1Click:Connect(function()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/ChimeraGaming/LuaScripts/main/Roblox_Scripts/GCI_Planet_Run.lua"))()
+end)
 
 local note = Instance.new("TextLabel")
 note.Size = UDim2.new(1, -40, 0, 22)
-note.Position = UDim2.fromOffset(20, 244)
+note.Position = UDim2.fromOffset(20, 246)
 note.BackgroundTransparency = 1
 note.Text = "Enable AntiAFK for best results"
 note.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -350,28 +307,45 @@ note.Font = Enum.Font.GothamBold
 note.TextSize = 12
 note.Parent = frame
 
---============================================================
--- 13. CREDIT
---============================================================
-
 local credit = Instance.new("TextLabel")
-credit.Size = UDim2.new(1, -40, 0, 18)
-credit.Position = UDim2.fromOffset(20, 268)
+credit.Size = UDim2.fromOffset(150, 18)
+credit.Position = UDim2.fromOffset(88, 270)
 credit.BackgroundTransparency = 1
 credit.Text = "Credit | Chimera__Gaming"
 credit.TextColor3 = Color3.fromRGB(230, 255, 230)
 credit.TextStrokeTransparency = 0.4
 credit.Font = Enum.Font.Gotham
 credit.TextSize = 10
+credit.TextXAlignment = Enum.TextXAlignment.Left
 credit.Parent = frame
 
---============================================================
--- 14. BOTTOM CONTROLS
---============================================================
+local coolButton = Instance.new("TextButton")
+coolButton.Size = UDim2.fromOffset(30, 30)
+coolButton.Position = UDim2.fromOffset(246, 263)
+coolButton.Text = "😎"
+coolButton.BackgroundColor3 = Color3.fromRGB(45, 135, 55)
+coolButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+coolButton.Font = Enum.Font.GothamBlack
+coolButton.TextSize = 18
+coolButton.BorderSizePixel = 0
+coolButton.Parent = frame
+
+local coolCorner = Instance.new("UICorner")
+coolCorner.CornerRadius = UDim.new(1, 0)
+coolCorner.Parent = coolButton
+
+local coolStroke = Instance.new("UIStroke")
+coolStroke.Color = Color3.fromRGB(15, 70, 20)
+coolStroke.Thickness = 2
+coolStroke.Parent = coolButton
+
+coolButton.MouseButton1Click:Connect(function()
+	teleportToCoolWorld()
+end)
 
 local minimize = Instance.new("TextButton")
 minimize.Size = UDim2.fromOffset(44, 34)
-minimize.Position = UDim2.fromOffset(18, 266)
+minimize.Position = UDim2.fromOffset(18, 258)
 minimize.Text = "━"
 minimize.BackgroundTransparency = 1
 minimize.TextColor3 = Color3.fromRGB(0, 170, 255)
@@ -382,7 +356,7 @@ minimize.Parent = frame
 
 local close = Instance.new("TextButton")
 close.Size = UDim2.fromOffset(44, 44)
-close.Position = UDim2.fromOffset(285, 228)
+close.Position = UDim2.fromOffset(285, 248)
 close.Text = "X"
 close.BackgroundTransparency = 1
 close.TextColor3 = Color3.fromRGB(255, 0, 35)
@@ -395,10 +369,6 @@ close.MouseButton1Click:Connect(function()
 	stop()
 	gui:Destroy()
 end)
-
---============================================================
--- 15. DRAGGING
---============================================================
 
 local function isInside(obj, pos)
 	if not obj or not obj.Visible then return false end
@@ -413,13 +383,18 @@ local function isInside(obj, pos)
 end
 
 local function isOnNoDragArea(pos)
-	if minimized then return false end
+	if minimized then
+		return false
+	end
 
 	return isInside(barBack, pos)
 		or isInside(knob, pos)
 		or isInside(toggle, pos)
+		or isInside(infYield, pos)
 		or isInside(grassland, pos)
-		or isInside(iy, pos)
+		or isInside(solarian, pos)
+		or isInside(planetRun, pos)
+		or isInside(coolButton, pos)
 		or isInside(minimize, pos)
 		or isInside(close, pos)
 end
@@ -477,10 +452,6 @@ UIS.InputEnded:Connect(function(input)
 	end
 end)
 
---============================================================
--- 16. MINIMIZE
---============================================================
-
 minimize.MouseButton1Click:Connect(function()
 	if minimized and minimizedDragMoved then
 		minimizedDragMoved = false
@@ -499,10 +470,13 @@ minimize.MouseButton1Click:Connect(function()
 		label.Visible = false
 		barBack.Visible = false
 		toggle.Visible = false
+		infYield.Visible = false
 		grassland.Visible = false
-		iy.Visible = false
+		solarian.Visible = false
+		planetRun.Visible = false
 		note.Visible = false
 		credit.Visible = false
+		coolButton.Visible = false
 		close.Visible = false
 
 		minimize.Size = UDim2.fromOffset(70, 70)
@@ -523,20 +497,23 @@ minimize.MouseButton1Click:Connect(function()
 		label.Visible = true
 		barBack.Visible = true
 		toggle.Visible = true
+		infYield.Visible = true
 		grassland.Visible = true
-		iy.Visible = true
+		solarian.Visible = true
+		planetRun.Visible = true
 		note.Visible = true
 		credit.Visible = true
+		coolButton.Visible = true
 		close.Visible = true
 
 		minimize.Size = UDim2.fromOffset(44, 34)
-		minimize.Position = UDim2.fromOffset(18, 286)
+		minimize.Position = UDim2.fromOffset(18, 258)
 		minimize.Text = "━"
 		minimize.TextColor3 = Color3.fromRGB(0, 170, 255)
 		minimize.TextStrokeTransparency = 0
 		minimize.Font = Enum.Font.GothamBlack
 		minimize.TextSize = 34
 
-		close.Position = UDim2.fromOffset(285, 278)
+		close.Position = UDim2.fromOffset(285, 248)
 	end
 end)
