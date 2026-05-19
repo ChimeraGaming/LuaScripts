@@ -19,7 +19,9 @@ local player = Players.LocalPlayer
 local MIN_SPEED = 50
 local MAX_SPEED = 200
 local speedValue = 100
+
 local DEFAULT_MIN_RUN_TIME = 21
+local START_WAIT_TIME = 2
 local DAILY_ZONE_BONUS = 50
 
 local dailyRunning = false
@@ -293,6 +295,8 @@ local function getTokenRunTime()
             for i = 1, #path - 1 do
                 total += (path[i + 1].Position - path[i].Position).Magnitude / speedValue
             end
+
+            total += START_WAIT_TIME
         end
     end
 
@@ -319,6 +323,13 @@ local function waitWithCountdown(levelName, remaining, statusLabel)
     end
 end
 
+local function waitAtStart(levelName, statusLabel)
+    for t = START_WAIT_TIME, 1, -1 do
+        setStatus(statusLabel, levelName .. " starting in " .. t .. "s")
+        task.wait(1)
+    end
+end
+
 local function runPath(levelName, levelData, statusLabel, skipTimer)
     local path = levelData.path
     local minRunTime = levelData.minTime or DEFAULT_MIN_RUN_TIME
@@ -331,6 +342,13 @@ local function runPath(levelName, levelData, statusLabel, skipTimer)
     local startTime = os.clock()
 
     for i, cf in ipairs(path) do
+        setStatus(statusLabel, levelName .. " > teleport " .. i .. "/" .. #path)
+        teleportTo(cf)
+
+        if i == 1 then
+            waitAtStart(levelName, statusLabel)
+        end
+
         if i == #path and not skipTimer then
             local remaining = minRunTime - (os.clock() - startTime)
 
@@ -338,9 +356,6 @@ local function runPath(levelName, levelData, statusLabel, skipTimer)
                 waitWithCountdown(levelName, remaining, statusLabel)
             end
         end
-
-        setStatus(statusLabel, levelName .. " > teleport " .. i .. "/" .. #path)
-        teleportTo(cf)
 
         task.wait(0.05)
     end
