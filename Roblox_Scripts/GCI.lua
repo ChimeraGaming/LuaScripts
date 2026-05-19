@@ -382,7 +382,7 @@ minimize.Parent = frame
 
 local close = Instance.new("TextButton")
 close.Size = UDim2.fromOffset(44, 44)
-close.Position = UDim2.fromOffset(285, 258)
+close.Position = UDim2.fromOffset(285, 228)
 close.Text = "X"
 close.BackgroundTransparency = 1
 close.TextColor3 = Color3.fromRGB(255, 0, 35)
