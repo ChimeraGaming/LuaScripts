@@ -29,6 +29,8 @@ end
 
 local BASE = "https://raw.githubusercontent.com/ChimeraGaming/LuaScripts/main/Roblox_Scripts/"
 local GITHUB_LINK = "https://github.com/ChimeraGaming/LuaScripts"
+local HUB_BACKGROUND_IMAGE = "rbxassetid://80879264147094"
+local HUB_BUTTON_IMAGE = "rbxassetid://90113253212765"
 
 local tabs = {
 	Games = {
@@ -83,32 +85,35 @@ gui.Parent = PlayerGui
 --============================================================
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(360, 520)
-frame.Position = UDim2.new(0.5, -180, 0.5, -260)
-frame.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
+frame.Size = UDim2.fromOffset(400, 500)
+frame.Position = UDim2.new(0.5, -200, 0.5, -250)
+frame.BackgroundTransparency = 1
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 14)
-
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(0, 200, 255)
-stroke.Thickness = 2
-stroke.Parent = frame
+local background = Instance.new("ImageLabel")
+background.Name = "HubBackground"
+background.Size = UDim2.fromScale(1, 1)
+background.BackgroundTransparency = 1
+background.Image = HUB_BACKGROUND_IMAGE
+background.ScaleType = Enum.ScaleType.Stretch
+background.ZIndex = 1
+background.Parent = frame
 
 --============================================================
 -- 06. TITLE
 --============================================================
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -70, 0, 36)
-title.Position = UDim2.fromOffset(12, 8)
+title.Size = UDim2.fromOffset(272, 48)
+title.Position = UDim2.fromOffset(64, 27)
 title.BackgroundTransparency = 1
 title.Text = "Chimera Hub"
 title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.TextColor3 = Color3.fromRGB(220, 240, 255)
-title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextSize = 20
+title.TextColor3 = Color3.fromRGB(255, 226, 166)
+title.TextXAlignment = Enum.TextXAlignment.Center
+title.TextYAlignment = Enum.TextYAlignment.Center
 title.ZIndex = 3
 title.Parent = frame
 
@@ -117,17 +122,22 @@ title.Parent = frame
 --============================================================
 
 local close = Instance.new("TextButton")
-close.Size = UDim2.fromOffset(28, 28)
-close.Position = UDim2.new(1, -38, 0, 8)
+close.Size = UDim2.fromOffset(26, 26)
+close.Position = UDim2.new(1, -41, 0, 14)
 close.Text = "X"
 close.Font = Enum.Font.GothamBold
 close.TextSize = 14
-close.BackgroundColor3 = Color3.fromRGB(80, 25, 35)
-close.TextColor3 = Color3.fromRGB(255, 160, 160)
+close.BackgroundColor3 = Color3.fromRGB(75, 35, 24)
+close.TextColor3 = Color3.fromRGB(255, 211, 143)
 close.ZIndex = 4
 close.Parent = frame
 
-Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+
+local closeStroke = Instance.new("UIStroke")
+closeStroke.Color = Color3.fromRGB(146, 91, 47)
+closeStroke.Thickness = 1
+closeStroke.Parent = close
 
 close.MouseButton1Click:Connect(function()
 	gui:Destroy()
@@ -138,22 +148,40 @@ end)
 --============================================================
 
 local function createButton(text, y, callback)
+	local container = Instance.new("Frame")
+	container.Name = "ScriptButton"
+	container.Size = UDim2.fromOffset(340, 48)
+	container.Position = UDim2.fromOffset(30, y)
+	container.BackgroundTransparency = 1
+	container.ZIndex = 2
+	container.Parent = frame
+
+	local buttonImage = Instance.new("ImageLabel")
+	buttonImage.Name = "Background"
+	buttonImage.Size = UDim2.fromScale(1, 1)
+	buttonImage.BackgroundTransparency = 1
+	buttonImage.Image = HUB_BUTTON_IMAGE
+	buttonImage.ScaleType = Enum.ScaleType.Stretch
+	buttonImage.ZIndex = 2
+	buttonImage.Parent = container
+
 	local button = Instance.new("TextButton")
-	button.Size = UDim2.fromOffset(320, 38)
-	button.Position = UDim2.fromOffset(20, y)
+	button.Name = "Hitbox"
+	button.Size = UDim2.new(1, -20, 1, -12)
+	button.Position = UDim2.fromOffset(10, 6)
 	button.Text = text
 	button.Font = Enum.Font.GothamBold
-	button.TextSize = 14
-	button.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
-	button.TextColor3 = Color3.fromRGB(235, 245, 255)
-	button.ZIndex = 2
-	button.Parent = frame
-
-	Instance.new("UICorner", button).CornerRadius = UDim.new(0, 10)
+	button.TextSize = 13
+	button.BackgroundTransparency = 1
+	button.TextColor3 = Color3.fromRGB(255, 235, 195)
+	button.TextStrokeColor3 = Color3.fromRGB(35, 15, 8)
+	button.TextStrokeTransparency = 0.45
+	button.ZIndex = 3
+	button.Parent = container
 
 	button.MouseButton1Click:Connect(callback)
 
-	return button
+	return container
 end
 
 --============================================================
@@ -162,13 +190,13 @@ end
 
 local creditFooter = Instance.new("TextLabel")
 creditFooter.Name = "CreditFooter"
-creditFooter.Size = UDim2.new(1, -24, 0, 46)
-creditFooter.Position = UDim2.new(0, 12, 1, -58)
+creditFooter.Size = UDim2.new(1, -90, 0, 30)
+creditFooter.Position = UDim2.fromOffset(45, 416)
 creditFooter.BackgroundTransparency = 1
 creditFooter.Text = "Credit | Chimera__Gaming\n" .. GITHUB_LINK
 creditFooter.Font = Enum.Font.Gotham
-creditFooter.TextSize = 12
-creditFooter.TextColor3 = Color3.fromRGB(160, 210, 235)
+creditFooter.TextSize = 10
+creditFooter.TextColor3 = Color3.fromRGB(213, 177, 124)
 creditFooter.TextWrapped = true
 creditFooter.TextXAlignment = Enum.TextXAlignment.Center
 creditFooter.TextYAlignment = Enum.TextYAlignment.Center
@@ -207,13 +235,8 @@ local activeTab = "Games"
 local scriptButtons = {}
 
 local function resizeFrameForTab(tabName)
-	local count = #tabs[tabName]
-	local height = 200 + (count * 45) + 70
-
-	frame.Size = UDim2.fromOffset(360, height)
-	frame.Position = UDim2.new(0.5, -180, 0.5, -(height / 2))
-
-	creditFooter.Position = UDim2.new(0, 12, 1, -58)
+	frame.Size = UDim2.fromOffset(400, 500)
+	creditFooter.Position = UDim2.fromOffset(45, 416)
 end
 
 local function clearScriptButtons()
@@ -225,9 +248,26 @@ local function clearScriptButtons()
 end
 
 local function updateTabColors(g, t, c)
-	g.BackgroundColor3 = activeTab == "Games" and Color3.fromRGB(40, 70, 105) or Color3.fromRGB(30, 45, 70)
-	t.BackgroundColor3 = activeTab == "Tools" and Color3.fromRGB(40, 70, 105) or Color3.fromRGB(30, 45, 70)
-	c.BackgroundColor3 = activeTab == "Credit" and Color3.fromRGB(40, 70, 105) or Color3.fromRGB(30, 45, 70)
+	local activeColor = Color3.fromRGB(255, 222, 145)
+	local inactiveColor = Color3.fromRGB(210, 177, 125)
+
+	if activeTab == "Games" then
+		g.TextColor3 = activeColor
+	else
+		g.TextColor3 = inactiveColor
+	end
+
+	if activeTab == "Tools" then
+		t.TextColor3 = activeColor
+	else
+		t.TextColor3 = inactiveColor
+	end
+
+	if activeTab == "Credit" then
+		c.TextColor3 = activeColor
+	else
+		c.TextColor3 = inactiveColor
+	end
 end
 
 local function renderTab(tabName, g, t, c)
@@ -235,7 +275,7 @@ local function renderTab(tabName, g, t, c)
 	clearScriptButtons()
 	resizeFrameForTab(tabName)
 
-	local y = 105
+	local y = 137
 
 	for _, item in ipairs(tabs[tabName]) do
 		local callback = item.File and function()
@@ -245,7 +285,7 @@ local function renderTab(tabName, g, t, c)
 		local btn = createButton(item.Name, y, callback)
 		table.insert(scriptButtons, btn)
 
-		y += 45
+		y = y + 46
 	end
 
 	creditFooter.Visible = true
@@ -258,29 +298,29 @@ end
 --============================================================
 
 local gamesTab = Instance.new("TextButton")
-gamesTab.Size = UDim2.fromOffset(105, 34)
-gamesTab.Position = UDim2.fromOffset(20, 55)
+gamesTab.Size = UDim2.fromOffset(102, 38)
+gamesTab.Position = UDim2.fromOffset(38, 89)
 gamesTab.Text = "Games"
 gamesTab.ZIndex = 3
 gamesTab.Parent = frame
 
 local toolsTab = gamesTab:Clone()
-toolsTab.Position = UDim2.fromOffset(130, 55)
+toolsTab.Position = UDim2.fromOffset(149, 89)
 toolsTab.Text = "Tools"
 toolsTab.Parent = frame
 
 local creditTab = gamesTab:Clone()
-creditTab.Position = UDim2.fromOffset(240, 55)
+creditTab.Position = UDim2.fromOffset(260, 89)
 creditTab.Text = "Credit"
 creditTab.Parent = frame
 
 for _, btn in ipairs({ gamesTab, toolsTab, creditTab }) do
 	btn.Font = Enum.Font.GothamBold
 	btn.TextSize = 14
-	btn.BackgroundColor3 = Color3.fromRGB(30, 45, 70)
-	btn.TextColor3 = Color3.fromRGB(235, 245, 255)
-
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+	btn.BackgroundTransparency = 1
+	btn.TextColor3 = Color3.fromRGB(210, 177, 125)
+	btn.TextStrokeColor3 = Color3.fromRGB(35, 15, 8)
+	btn.TextStrokeTransparency = 0.55
 end
 
 gamesTab.MouseButton1Click:Connect(function()
