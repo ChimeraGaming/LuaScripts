@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local ContentProvider = game:GetService("ContentProvider")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -283,7 +284,6 @@ local function collectorToggle(text, y, name)
     caption.Position = UDim2.fromOffset(34, y)
     caption.Size = UDim2.fromOffset(242, 44)
     caption.TextSize = 13
-    if name == "Star" then caption.TextColor3 = Color3.fromRGB(192, 163, 123) end
     local toggle = button("OFF", 292, y + 5, 34)
     toggle.Size = UDim2.fromOffset(34, 34)
     toggle.BackgroundColor3 = Theme.Off
@@ -296,7 +296,7 @@ local function collectorToggle(text, y, name)
     stroke.Transparency = 0.2
     return toggle, stroke
 end
-local starButton, starStroke = collectorToggle("Star Collector (Broken)", 412, "Star")
+local starButton, starStroke = collectorToggle("Star Collector + Upgrades", 412, "Star")
 local walkButton, walkStroke = collectorToggle("Pumpkin Collector", 464, "Pumpkin")
 local statusBack = new("Frame", {
     Position = UDim2.fromOffset(20, 520), Size = UDim2.fromOffset(320, 36),
@@ -379,28 +379,83 @@ local function nearestPumpkin(position)
     return nearest
 end
 
-local function nearestStar(position)
-    local realm = workspace:FindFirstChild("AstralRealm")
-    local stars = realm and realm:FindFirstChild("stars")
-    if not stars then return nil end
-    local nearest, distance
-    for _, star in ipairs(stars:GetChildren()) do
-        if star.Name == "Part" then
-            local part
-            if star:IsA("BasePart") then
-                part = star
-            elseif star:IsA("Model") then
-                part = star.PrimaryPart or star:FindFirstChildWhichIsA("BasePart", true)
-            end
-            if part then
-                local d = (position - part.Position).Magnitude
-                if not distance or d < distance then
-                    nearest, distance = part.Position, d
-                end
+-- Star collection/upgrade IDs and teleport offset come from the supplied older script.
+local STAR_UPGRADE_IDS = {
+    "StarSpawnSpeed", "StarLuck", "StarCapacity", "StarCollectionRange",
+    "AutoSoulfire", "AutoSoulfireUpgrades",
+    "StarStarsMultiplier", "StarLuckMultiplier", "StarQiMultiplier",
+}
+local starQueue, starQueueIndex, starQueueFolder = {}, 1, nil
+local starUpgradeIndex, nextStarUpgradeAt = 1, 0
+local starUpgradeWarning
+
+local function resetStarCollector()
+    table.clear(starQueue)
+    starQueueIndex, starQueueFolder = 1, nil
+    starUpgradeIndex, nextStarUpgradeAt = 1, 0
+    starUpgradeWarning = nil
+end
+
+local function nextStarPart()
+    -- Re-resolve the folder so loading, replacement, and new spawns are supported.
+    local folder = workspace:FindFirstChild("StarForgingLocalVisuals")
+    if not folder then
+        table.clear(starQueue)
+        starQueueIndex, starQueueFolder = 1, nil
+        return nil
+    end
+    if folder ~= starQueueFolder or starQueueIndex > #starQueue then
+        table.clear(starQueue)
+        starQueueIndex, starQueueFolder = 1, folder
+        for _, star in ipairs(folder:GetChildren()) do
+            if star.Name:match("^Star_%d+$") then
+                local template = star:FindFirstChild("StarTemplate")
+                if template then table.insert(starQueue, template) end
             end
         end
     end
-    return nearest
+    while starQueueIndex <= #starQueue do
+        local template = starQueue[starQueueIndex]
+        starQueueIndex = starQueueIndex + 1
+        if template:IsDescendantOf(folder) then
+            if template:IsA("BasePart") then return template end
+            if template:IsA("Model") then
+                local part = template.PrimaryPart or template:FindFirstChildWhichIsA("BasePart", true)
+                if part then return part end
+            end
+        end
+    end
+    return nil
+end
+
+local function requestStarUpgrade()
+    local now = os.clock()
+    if now < nextStarUpgradeAt then return end
+    nextStarUpgradeAt = now + 0.3
+    local events = ReplicatedStorage:FindFirstChild("RemoteEvents")
+    local purchase = events and events:FindFirstChild("PurchaseUpgrade")
+    if not purchase or not purchase:IsA("RemoteEvent") then
+        starUpgradeWarning = "Star upgrade remote unavailable"
+        nextStarUpgradeAt = now + 1.5
+        return
+    end
+    local ok, err = pcall(function()
+        purchase:FireServer(STAR_UPGRADE_IDS[starUpgradeIndex], true)
+    end)
+    if not ok then
+        if starUpgradeWarning ~= "Star upgrade request failed" then
+            warn("[ImmortalityIncremental] Star upgrade request: " .. tostring(err))
+        end
+        starUpgradeWarning = "Star upgrade request failed"
+        nextStarUpgradeAt = now + 1.5
+        return
+    end
+    starUpgradeWarning = nil
+    starUpgradeIndex = starUpgradeIndex + 1
+    if starUpgradeIndex > #STAR_UPGRADE_IDS then
+        starUpgradeIndex = 1
+        nextStarUpgradeAt = now + 0.6
+    end
 end
 
 local function updateToggle(toggle, stroke, enabled)
@@ -413,9 +468,47 @@ end
 
 local function setCollector(mode)
     stopWalking()
+    resetStarCollector()
     activeCollector = mode
     updateToggle(walkButton, walkStroke, mode == "Pumpkin")
     updateToggle(starButton, starStroke, mode == "Star")
+end
+
+local function collectorStep()
+    if not activeCollector then
+        local count = countPumpkins()
+        return count > 0 and ("Ready: " .. count .. " pumpkins") or "Collectors are OFF.", 0.25
+    end
+    if activeCollector == "Star" then requestStarUpgrade() end
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root or humanoid.Health <= 0 then
+        stopWalking()
+        return "Waiting for character...", 0.25
+    end
+    if activeCollector == "Star" then
+        local part = nextStarPart()
+        local message
+        if part then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+            root.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0))
+            message = "Collecting stars + requesting upgrades"
+        else
+            message = "No live stars in StarForgingLocalVisuals; waiting..."
+        end
+        if starUpgradeWarning then message = message .. " | " .. starUpgradeWarning end
+        return message, 0.15
+    end
+    local target = nearestPumpkin(root.Position)
+    if target then
+        lastHumanoid = humanoid
+        humanoid:MoveTo(target)
+        return "Walking to nearest Pumpkin", 0.25
+    end
+    stopWalking()
+    return "No pumpkins in HalloweenPumpkinsLocal; waiting...", 0.25
 end
 
 connect(walkButton.Activated, function()
@@ -25969,43 +26062,9 @@ end)
 
 task.spawn(function()
     while alive do
-        local count = countPumpkins()
-        local message
-        if count > 0 then
-            message = "Ready: " .. count .. " pumpkins"
-        else
-            message = "Waiting for HalloweenPumpkinsLocal pumpkins..."
-        end
-        if activeCollector then
-            local character = player.Character
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            local root = character and character:FindFirstChild("HumanoidRootPart")
-            if humanoid and root and humanoid.Health > 0 then
-                local target
-                if activeCollector == "Star" then
-                    target = nearestStar(root.Position)
-                else
-                    target = nearestPumpkin(root.Position)
-                end
-                if target then
-                    lastHumanoid = humanoid
-                    humanoid:MoveTo(target)
-                    message = "Walking to nearest " .. activeCollector
-                else
-                    stopWalking()
-                    if activeCollector == "Star" then
-                        message = "No stars in AstralRealm.stars; waiting..."
-                    else
-                        message = "No pumpkins in HalloweenPumpkinsLocal; waiting..."
-                    end
-                end
-            else
-                stopWalking()
-                message = "Waiting for character..."
-            end
-        end
+        local message, delay = collectorStep()
         status.Text = os.clock() < noticeUntil and noticeText or message
         statusDot.BackgroundColor3 = activeCollector and Theme.Accent or Theme.Muted
-        task.wait(0.25)
+        task.wait(delay)
     end
 end)
