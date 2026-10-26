@@ -26,6 +26,10 @@ local alive = true
 local launching = true
 local startupTweens = {}
 local lastHumanoid
+local dabloonEnabled, dabloonBusy = false, false
+local dabloonTrip, dabloonGeneration = nil, 0
+local dabloonAttempts = setmetatable({}, {__mode = "k"})
+local dabloonMessage = "Waiting for dabloons..."
 local noticeText, noticeUntil = "", 0
 local Theme = {
     Surface = Color3.fromRGB(32, 30, 49),
@@ -56,7 +60,7 @@ end
 
 local frame = new("CanvasGroup", {
     Name = "MainPanel", AnchorPoint = Vector2.new(0.5, 0.5),
-    Size = UDim2.fromOffset(360, 628), Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.fromOffset(360, 724), Position = UDim2.fromScale(0.5, 0.5),
     BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
     GroupTransparency = 1, Visible = false,
 }, gui)
@@ -76,7 +80,7 @@ local function fitPanel()
     local camera = workspace.CurrentCamera
     if camera then
         local viewport = camera.ViewportSize
-        panelScale.Scale = math.max(0.1, math.min(1, (viewport.X - 32) / 360, (viewport.Y - 76) / 628))
+        panelScale.Scale = math.max(0.1, math.min(1, (viewport.X - 32) / 360, (viewport.Y - 76) / 724))
         if introScale then
             introScale.Scale = math.max(0.1, math.min(1, (viewport.X - 32) / 520, (viewport.Y - 76) / 240))
         end
@@ -185,7 +189,7 @@ local function setMinimized(enabled)
             -- Start near the panel's upper-left corner, then remember icon dragging.
             minimizedPosition = UDim2.new(
                 frame.Position.X.Scale, frame.Position.X.Offset - 180 * panelScale.Scale + 44,
-                frame.Position.Y.Scale, frame.Position.Y.Offset - 314 * panelScale.Scale + 44
+                frame.Position.Y.Scale, frame.Position.Y.Offset - 362 * panelScale.Scale + 44
             )
         end
         mascotButton.Position = minimizedPosition
@@ -298,8 +302,9 @@ local function collectorToggle(text, y, name)
 end
 local starButton, starStroke = collectorToggle("Star Collector + Upgrades", 412, "Star")
 local walkButton, walkStroke = collectorToggle("Pumpkin Collector", 464, "Pumpkin")
+local dabloonButton, dabloonStroke = collectorToggle("Dabloon Auto Collect", 516, "Dabloon")
 local statusBack = new("Frame", {
-    Position = UDim2.fromOffset(20, 520), Size = UDim2.fromOffset(320, 36),
+    Position = UDim2.fromOffset(20, 616), Size = UDim2.fromOffset(320, 36),
     BackgroundColor3 = Color3.fromRGB(23, 24, 38), BorderSizePixel = 0,
 }, frame)
 new("UICorner", {CornerRadius = UDim.new(0, 8)}, statusBack)
@@ -308,24 +313,24 @@ local statusDot = new("Frame", {
     BackgroundColor3 = Theme.Muted, BorderSizePixel = 0,
 }, statusBack)
 new("UICorner", {CornerRadius = UDim.new(1, 0)}, statusDot)
-local status = label("Waiting for pumpkins...", 520)
-status.Position = UDim2.fromOffset(48, 520)
+local status = label("Waiting for pumpkins...", 616)
+status.Position = UDim2.fromOffset(48, 616)
 status.Font = Enum.Font.Gotham
 status.TextSize = 10
 status.TextColor3 = Theme.Muted
 status.Size = UDim2.fromOffset(280, 36)
 status.TextWrapped = true
 new("Frame", {
-    Position = UDim2.fromOffset(20, 568), Size = UDim2.fromOffset(320, 1),
+    Position = UDim2.fromOffset(20, 664), Size = UDim2.fromOffset(320, 1),
     BackgroundColor3 = Theme.Border, BackgroundTransparency = 0.6, BorderSizePixel = 0,
 }, frame)
-local credit = label("ChimeraGaming  ·  Always free", 578)
+local credit = label("ChimeraGaming  ·  Always free", 674)
 credit.Size = UDim2.fromOffset(320, 16)
 credit.TextSize = 11
 credit.TextColor3 = Color3.fromRGB(204, 189, 232)
 credit.TextXAlignment = Enum.TextXAlignment.Center
 credit.TextWrapped = true
-local creditLink = label("github.com/ChimeraGaming/LuaScripts", 598)
+local creditLink = label("github.com/ChimeraGaming/LuaScripts", 694)
 creditLink.Size = UDim2.fromOffset(320, 14)
 creditLink.Font = Enum.Font.Gotham
 creditLink.TextSize = 10
@@ -474,8 +479,107 @@ local function setCollector(mode)
     updateToggle(starButton, starStroke, mode == "Star")
 end
 
+local function dabloonPart(object)
+    if object:IsA("BasePart") then return object end
+    if object:IsA("Model") then
+        return object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart", true)
+    end
+    return nil
+end
+
+local function cancelDabloonTrip(restore)
+    dabloonGeneration = dabloonGeneration + 1
+    local trip = dabloonTrip
+    dabloonTrip, dabloonBusy = nil, false
+    if restore and trip and player.Character == trip.Character and trip.Root.Parent
+        and trip.Humanoid.Health > 0 then
+        pcall(function()
+            trip.Root.CFrame = trip.Origin
+            trip.Root.AssemblyLinearVelocity = Vector3.zero
+            trip.Root.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+end
+
+local function setDabloonEnabled(enabled, restore)
+    dabloonEnabled = enabled
+    updateToggle(dabloonButton, dabloonStroke, enabled)
+    if enabled then
+        table.clear(dabloonAttempts)
+        dabloonMessage = "Checking for dabloons every 1s..."
+    else
+        cancelDabloonTrip(restore ~= false)
+    end
+end
+
+local function dabloonSpawnPosition(name)
+    local zones = workspace:FindFirstChild("DabloonSpawnZones")
+    local zone = zones and zones:FindFirstChild(name)
+    local part = zone and dabloonPart(zone)
+    return part and (part.Position + Vector3.new(0, 3, 0))
+end
+
+local function collectDabloon()
+    if not alive or launching or not dabloonEnabled or dabloonBusy then return end
+    -- Spawn zones are for manual buttons only; auto collection requires a live coin.
+    local coins = workspace:FindFirstChild("DabloonCoins")
+    if not coins then
+        dabloonMessage = "Waiting for Workspace.DabloonCoins..."
+        return
+    end
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root or humanoid.Health <= 0 then
+        dabloonMessage = "Dabloons: waiting for character..."
+        return
+    end
+    local now = os.clock()
+    local target, targetPart, distance
+    local function scan(container)
+        for _, object in ipairs(container:GetChildren()) do
+            if object:IsA("Folder") then
+                scan(object)
+            else
+                local part = dabloonPart(object)
+                local lastAttempt = dabloonAttempts[object]
+                if part and (not lastAttempt or now - lastAttempt >= 5) then
+                    local d = (root.Position - part.Position).Magnitude
+                    if not distance or d < distance then target, targetPart, distance = object, part, d end
+                end
+            end
+        end
+    end
+    scan(coins)
+    if not targetPart or not targetPart:IsDescendantOf(coins) then
+        dabloonMessage = "Dabloons: watching for new coins..."
+        return
+    end
+    local trip = {Character = character, Humanoid = humanoid, Root = root, Origin = root.CFrame}
+    local generation = dabloonGeneration
+    dabloonTrip, dabloonBusy = trip, true
+    dabloonAttempts[target] = now
+    dabloonMessage = "Picking up a dabloon..."
+    local ok, err = pcall(function()
+        stopWalking()
+        humanoid:MoveTo(root.Position)
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        root.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, 3, 0))
+        task.wait(0.25)
+    end)
+    if dabloonTrip == trip and generation == dabloonGeneration then
+        cancelDabloonTrip(true)
+        dabloonMessage = ok and "Returned from dabloon pickup. Watching for more..." or "Dabloon pickup failed; retrying..."
+    end
+    if not ok then warn("[ImmortalityIncremental] Dabloon pickup: " .. tostring(err)) end
+end
+
 local function collectorStep()
+    -- Pause other movement during the temporary pickup and return trip.
+    if dabloonBusy then return dabloonMessage, 0.1 end
     if not activeCollector then
+        if dabloonEnabled then return dabloonMessage, 0.25 end
         local count = countPumpkins()
         return count > 0 and ("Ready: " .. count .. " pumpkins") or "Collectors are OFF.", 0.25
     end
@@ -517,6 +621,7 @@ end)
 connect(starButton.Activated, function()
     if activeCollector == "Star" then setCollector(nil) else setCollector("Star") end
 end)
+connect(dabloonButton.Activated, function() setDabloonEnabled(not dabloonEnabled) end)
 connect(close.Activated, function() gui:Destroy() end)
 
 connect(yieldButton.Activated, function()
@@ -555,6 +660,7 @@ local function teleport(name, position)
         notify("Character unavailable; try the teleport again after spawning.")
         return
     end
+    setDabloonEnabled(false, false)
     setCollector(nil)
     humanoid:MoveTo(root.Position)
     root.AssemblyLinearVelocity = Vector3.zero
@@ -25911,7 +26017,11 @@ local function teleportButton(name, position, x, y, width)
         targetButton.BackgroundColor3 = colors.Background
         targetButton.TextColor3 = colors.Text
     end
-    connect(targetButton.Activated, function() teleport(name, position) end)
+    connect(targetButton.Activated, function()
+        local target = position
+        if type(target) == "function" then target = target() end
+        if target then teleport(name, target) else notify(name .. " spawn zone is not loaded.") end
+    end)
     if textureData[name] or textureAssetIds[name] then
         task.spawn(applyTexture, targetButton, name)
     end
@@ -25935,6 +26045,11 @@ halloweenButton.TextColor3 = Color3.fromRGB(35, 20, 5)
 new("UIGradient", {
     Color = ColorSequence.new(Color3.fromRGB(255, 188, 55), Color3.fromRGB(255, 132, 35)), Rotation = 10,
 }, halloweenButton)
+
+teleportButton("Dab1", function() return dabloonSpawnPosition("Map1") end, 20, 568, 74)
+teleportButton("Dab2", function() return dabloonSpawnPosition("Heaven") end, 102, 568, 74)
+teleportButton("Dab3", function() return dabloonSpawnPosition("ScenePath") end, 184, 568, 74)
+teleportButton("Dab4", function() return dabloonSpawnPosition("AstralRealm") end, 266, 568, 74)
 
 local dragging, dragStart, startPosition, dragTarget
 local mascotDragMoved = false
@@ -25973,6 +26088,8 @@ connect(UIS.InputEnded, function(input)
 end)
 connect(gui.Destroying, function()
     alive = false
+    dabloonEnabled = false
+    cancelDabloonTrip(true)
     for _, tween in ipairs(startupTweens) do tween:Cancel() end
     for _, tween in ipairs(yieldTweens) do tween:Cancel() end
     for _, tween in pairs(tileTweens) do tween:Cancel() end
@@ -26062,9 +26179,17 @@ end)
 
 task.spawn(function()
     while alive do
+        local checkStarted = os.clock()
+        if dabloonEnabled then collectDabloon() end
+        task.wait(math.max(0.05, 1 - (os.clock() - checkStarted)))
+    end
+end)
+
+task.spawn(function()
+    while alive do
         local message, delay = collectorStep()
         status.Text = os.clock() < noticeUntil and noticeText or message
-        statusDot.BackgroundColor3 = activeCollector and Theme.Accent or Theme.Muted
+        statusDot.BackgroundColor3 = (activeCollector or dabloonEnabled) and Theme.Accent or Theme.Muted
         task.wait(delay)
     end
 end)
