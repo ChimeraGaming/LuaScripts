@@ -60,7 +60,7 @@ end
 
 local frame = new("CanvasGroup", {
     Name = "MainPanel", AnchorPoint = Vector2.new(0.5, 0.5),
-    Size = UDim2.fromOffset(360, 724), Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.fromOffset(360, 768), Position = UDim2.fromScale(0.5, 0.5),
     BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
     GroupTransparency = 1, Visible = false,
 }, gui)
@@ -80,7 +80,7 @@ local function fitPanel()
     local camera = workspace.CurrentCamera
     if camera then
         local viewport = camera.ViewportSize
-        panelScale.Scale = math.max(0.1, math.min(1, (viewport.X - 32) / 360, (viewport.Y - 76) / 724))
+        panelScale.Scale = math.max(0.1, math.min(1, (viewport.X - 32) / 360, (viewport.Y - 76) / 768))
         if introScale then
             introScale.Scale = math.max(0.1, math.min(1, (viewport.X - 32) / 520, (viewport.Y - 76) / 240))
         end
@@ -189,7 +189,7 @@ local function setMinimized(enabled)
             -- Start near the panel's upper-left corner, then remember icon dragging.
             minimizedPosition = UDim2.new(
                 frame.Position.X.Scale, frame.Position.X.Offset - 180 * panelScale.Scale + 44,
-                frame.Position.Y.Scale, frame.Position.Y.Offset - 362 * panelScale.Scale + 44
+                frame.Position.Y.Scale, frame.Position.Y.Offset - 384 * panelScale.Scale + 44
             )
         end
         mascotButton.Position = minimizedPosition
@@ -272,7 +272,7 @@ connect(UIS.InputEnded, function(input)
     end
 end)
 section("WORLD TELEPORTS", 132)
-section("COLLECTORS", 388)
+section("COLLECTORS", 432)
 local function collectorToggle(text, y, name)
     local row = new("Frame", {
         Name = name .. "CollectorRow", Position = UDim2.fromOffset(20, y),
@@ -300,11 +300,11 @@ local function collectorToggle(text, y, name)
     stroke.Transparency = 0.2
     return toggle, stroke
 end
-local starButton, starStroke = collectorToggle("Star Collector + Upgrades", 412, "Star")
-local walkButton, walkStroke = collectorToggle("Pumpkin Collector", 464, "Pumpkin")
-local dabloonButton, dabloonStroke = collectorToggle("Dabloon Auto Collect", 516, "Dabloon")
+local starButton, starStroke = collectorToggle("Star Collector + Upgrades", 456, "Star")
+local walkButton, walkStroke = collectorToggle("Pumpkin Collector", 508, "Pumpkin")
+local dabloonButton, dabloonStroke = collectorToggle("Dabloon Auto Collect", 560, "Dabloon")
 local statusBack = new("Frame", {
-    Position = UDim2.fromOffset(20, 616), Size = UDim2.fromOffset(320, 36),
+    Position = UDim2.fromOffset(20, 660), Size = UDim2.fromOffset(320, 36),
     BackgroundColor3 = Color3.fromRGB(23, 24, 38), BorderSizePixel = 0,
 }, frame)
 new("UICorner", {CornerRadius = UDim.new(0, 8)}, statusBack)
@@ -313,24 +313,24 @@ local statusDot = new("Frame", {
     BackgroundColor3 = Theme.Muted, BorderSizePixel = 0,
 }, statusBack)
 new("UICorner", {CornerRadius = UDim.new(1, 0)}, statusDot)
-local status = label("Waiting for pumpkins...", 616)
-status.Position = UDim2.fromOffset(48, 616)
+local status = label("Waiting for pumpkins...", 660)
+status.Position = UDim2.fromOffset(48, 660)
 status.Font = Enum.Font.Gotham
 status.TextSize = 10
 status.TextColor3 = Theme.Muted
 status.Size = UDim2.fromOffset(280, 36)
 status.TextWrapped = true
 new("Frame", {
-    Position = UDim2.fromOffset(20, 664), Size = UDim2.fromOffset(320, 1),
+    Position = UDim2.fromOffset(20, 708), Size = UDim2.fromOffset(320, 1),
     BackgroundColor3 = Theme.Border, BackgroundTransparency = 0.6, BorderSizePixel = 0,
 }, frame)
-local credit = label("ChimeraGaming  ·  Always free", 674)
+local credit = label("ChimeraGaming  ·  Always free", 718)
 credit.Size = UDim2.fromOffset(320, 16)
 credit.TextSize = 11
 credit.TextColor3 = Color3.fromRGB(204, 189, 232)
 credit.TextXAlignment = Enum.TextXAlignment.Center
 credit.TextWrapped = true
-local creditLink = label("github.com/ChimeraGaming/LuaScripts", 694)
+local creditLink = label("github.com/ChimeraGaming/LuaScripts", 738)
 creditLink.Size = UDim2.fromOffset(320, 14)
 creditLink.Font = Enum.Font.Gotham
 creditLink.TextSize = 10
@@ -681,6 +681,7 @@ local worldColors = {
     W7 = {Background = Color3.fromRGB(184, 159, 188), Text = Color3.fromRGB(30, 23, 45)},
     W8 = {Background = Color3.fromRGB(132, 117, 112), Text = Color3.new(0, 0, 0)},
     W9 = {Background = Color3.fromRGB(127, 108, 108), Text = Color3.new(1, 1, 1)},
+    W10 = {Background = Color3.fromRGB(107, 82, 74), Text = Color3.new(1, 1, 1)},
 }
 
 -- Optional uploaded Roblox image IDs take priority over the embedded PNGs.
@@ -688,6 +689,140 @@ local textureAssetIds = {}
 
 -- BEGIN EMBEDDED TEXTURES
 local textureData = {
+    W10 = [=[
+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
+AABJRU5ErkJggg==
+]=],
     W7 = [=[
 iVBORw0KGgoAAAANSUhEUgAAAQcAAAAlCAYAAABPuCwuAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAACl7SURB
 VHhenZ1pklw5lp1fcJ6HTGZWVqtkWlD3X0lmkhZTu+hNyPSvlyIz/ek2lTormRMzGUEyBgYHne+cewE8j2CpTccduBd3wvAAPDx3D/Lof/zjP33+vG3bkV7b
@@ -26038,7 +26173,8 @@ teleportButton("W6", Vector3.new(363, 1370, -383), 240, 246, 100)
 teleportButton("W7", Vector3.new(-1385, 50, -943), 20, 290, 100)
 teleportButton("W8", Vector3.new(-1674, 649, -25), 130, 290, 100)
 teleportButton("W9", Vector3.new(-880, 17, 1400), 240, 290, 100)
-local halloweenButton = teleportButton("Halloween Teleport", Vector3.new(-8, 1026, 1333), 20, 336, 320)
+teleportButton("W10", Vector3.new(246, 209, 1785), 20, 336, 320)
+local halloweenButton = teleportButton("Halloween Teleport", Vector3.new(-8, 1026, 1333), 20, 380, 320)
 halloweenButton.Size = UDim2.fromOffset(320, 38)
 halloweenButton.BackgroundColor3 = Color3.new(1, 1, 1)
 halloweenButton.TextColor3 = Color3.fromRGB(35, 20, 5)
@@ -26046,10 +26182,10 @@ new("UIGradient", {
     Color = ColorSequence.new(Color3.fromRGB(255, 188, 55), Color3.fromRGB(255, 132, 35)), Rotation = 10,
 }, halloweenButton)
 
-teleportButton("Dab1", function() return dabloonSpawnPosition("Map1") end, 20, 568, 74)
-teleportButton("Dab2", function() return dabloonSpawnPosition("Heaven") end, 102, 568, 74)
-teleportButton("Dab3", function() return dabloonSpawnPosition("ScenePath") end, 184, 568, 74)
-teleportButton("Dab4", function() return dabloonSpawnPosition("AstralRealm") end, 266, 568, 74)
+teleportButton("Dab1", function() return dabloonSpawnPosition("Map1") end, 20, 612, 74)
+teleportButton("Dab2", function() return dabloonSpawnPosition("Heaven") end, 102, 612, 74)
+teleportButton("Dab3", function() return dabloonSpawnPosition("ScenePath") end, 184, 612, 74)
+teleportButton("Dab4", function() return dabloonSpawnPosition("AstralRealm") end, 266, 612, 74)
 
 local dragging, dragStart, startPosition, dragTarget
 local mascotDragMoved = false
