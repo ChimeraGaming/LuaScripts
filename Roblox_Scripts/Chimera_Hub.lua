@@ -39,7 +39,10 @@ local tabs = {
 		{ Name = "[🔮] Knowledge Incremental", File = "Knowledge_Incremental.lua" },
 		{ Name = "Money Incremental 💸", File = "Money_Incremental.lua" },
 		{ Name = "🌙 [UPD 5] Moon Incremental", File = "Moon_Incremental.lua" },
-		{ Name = "[🌎] Space Incremental", File = "Space_Incremental.lua" }
+		{ Name = "[🌎] Space Incremental", File = "Space_Incremental.lua" },
+		{ Name = "Resource Incremental", File = "Resource_Incremental.lua" },
+		{ Name = "Dirt Incremental X", File = "Dirt_Incremental_X.lua" },
+		{ Name = "Immortal Incremental", File = "Immortal_Incremental.lua" }
 	},
 
 	Tools = {
@@ -86,7 +89,8 @@ gui.Parent = PlayerGui
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.fromOffset(400, 500)
-frame.Position = UDim2.new(0.5, -200, 0.5, -250)
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.Position = UDim2.fromScale(0.5, 0.5)
 frame.BackgroundTransparency = 1
 frame.BorderSizePixel = 0
 frame.Parent = gui
@@ -100,13 +104,38 @@ background.ScaleType = Enum.ScaleType.Stretch
 background.ZIndex = 1
 background.Parent = frame
 
+local windowScale = Instance.new("UIScale")
+windowScale.Parent = frame
+local viewportConnection
+local function fitWindow()
+	local camera = workspace.CurrentCamera
+	if camera then
+		local viewport = camera.ViewportSize
+		windowScale.Scale = math.min(1, math.max(1, viewport.X - 24) / 400, math.max(1, viewport.Y - 24) / 500)
+	end
+end
+local function watchCamera()
+	if viewportConnection then viewportConnection:Disconnect() end
+	local camera = workspace.CurrentCamera
+	if camera then
+		viewportConnection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitWindow)
+	end
+	fitWindow()
+end
+local cameraConnection = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
+watchCamera()
+gui.Destroying:Connect(function()
+	cameraConnection:Disconnect()
+	if viewportConnection then viewportConnection:Disconnect() end
+end)
+
 --============================================================
 -- 06. TITLE
 --============================================================
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.fromOffset(272, 48)
-title.Position = UDim2.fromOffset(64, 27)
+title.Size = UDim2.new(0.68, 0, 0, 48)
+title.Position = UDim2.new(0.16, 0, 0, 27)
 title.BackgroundTransparency = 1
 title.Text = "Chimera Hub"
 title.Font = Enum.Font.GothamBold
@@ -147,11 +176,11 @@ end)
 -- 08. BUTTON CREATOR
 --============================================================
 
-local function createButton(text, y, callback)
+local function createButton(text, x, y, width, height, callback)
 	local container = Instance.new("Frame")
 	container.Name = "ScriptButton"
-	container.Size = UDim2.fromOffset(340, 48)
-	container.Position = UDim2.fromOffset(30, y)
+	container.Size = UDim2.fromOffset(width, height)
+	container.Position = UDim2.fromOffset(x, y)
 	container.BackgroundTransparency = 1
 	container.ZIndex = 2
 	container.Parent = frame
@@ -167,11 +196,12 @@ local function createButton(text, y, callback)
 
 	local button = Instance.new("TextButton")
 	button.Name = "Hitbox"
-	button.Size = UDim2.new(1, -20, 1, -12)
-	button.Position = UDim2.fromOffset(10, 6)
+	button.Size = UDim2.new(1, -20, 1, -6)
+	button.Position = UDim2.fromOffset(10, 3)
 	button.Text = text
 	button.Font = Enum.Font.GothamBold
 	button.TextSize = 13
+	button.TextWrapped = true
 	button.BackgroundTransparency = 1
 	button.TextColor3 = Color3.fromRGB(255, 235, 195)
 	button.TextStrokeColor3 = Color3.fromRGB(35, 15, 8)
@@ -275,17 +305,21 @@ local function renderTab(tabName, g, t, c)
 	clearScriptButtons()
 	resizeFrameForTab(tabName)
 
-	local y = 137
+	-- Compact game rows fit all nine entries above the original footer.
+	local height = tabName == "Games" and 30 or 48
+	local rowStep = tabName == "Games" and 30 or 50
 
-	for _, item in ipairs(tabs[tabName]) do
+	for index, item in ipairs(tabs[tabName]) do
 		local callback = item.File and function()
 			loadScript(item.File)
 		end or item.Custom
 
-		local btn = createButton(item.Name, y, callback)
+		local y = 137 + (index - 1) * rowStep
+		
+		local btn = createButton(item.Name, 30, y, 340, height, callback)
 		table.insert(scriptButtons, btn)
 
-		y = y + 46
+		
 	end
 
 	creditFooter.Visible = true
@@ -298,19 +332,19 @@ end
 --============================================================
 
 local gamesTab = Instance.new("TextButton")
-gamesTab.Size = UDim2.fromOffset(102, 38)
-gamesTab.Position = UDim2.fromOffset(38, 89)
+gamesTab.Size = UDim2.new(0.255, 0, 0, 38)
+gamesTab.Position = UDim2.new(0.095, 0, 0, 89)
 gamesTab.Text = "Games"
 gamesTab.ZIndex = 3
 gamesTab.Parent = frame
 
 local toolsTab = gamesTab:Clone()
-toolsTab.Position = UDim2.fromOffset(149, 89)
+toolsTab.Position = UDim2.new(0.3725, 0, 0, 89)
 toolsTab.Text = "Tools"
 toolsTab.Parent = frame
 
 local creditTab = gamesTab:Clone()
-creditTab.Position = UDim2.fromOffset(260, 89)
+creditTab.Position = UDim2.new(0.65, 0, 0, 89)
 creditTab.Text = "Credit"
 creditTab.Parent = frame
 
